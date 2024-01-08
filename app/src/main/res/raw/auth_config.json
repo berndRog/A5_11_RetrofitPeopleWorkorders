@@ -1,0 +1,7 @@
+{
+  "client_id": "{{YourClientID}}",
+  "redirect_uri": "com.oktapreview.{{yourOrg}}:/oauth",
+  "end_session_uri": "com.oktapreview.{{yourOrg}}:/{logoutCallback}",
+  "authorization_scope": "openid email profile",
+  "discovery_uri": "https://{{yourOrg}}.okta.com/.well-known/openid-configuration"
+}

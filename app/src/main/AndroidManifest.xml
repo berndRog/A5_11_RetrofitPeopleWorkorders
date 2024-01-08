@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- -->
+  <uses-permission android:name="android.permission.INTERNET"
+    android:allowBackup="true" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"
+    android:allowBackup="true" />
+  <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"
+    android:allowBackup="true" />
+
+  <!-- Runtime permissions -->
+  <uses-feature
+    android:name="android.hardware.camera"
+    android:required="false" />
+  <uses-permission android:name="android.permission.CAMERA" />
+
+
+  <!-- Required for Android 10 (API level 29) and higher. -->
+  <!--
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+
+  <uses-feature
+    android:name="android.hardware.telephony"
+    android:required="false" />
+  <uses-permission android:name="android.permission.CALL_PHONE" />
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+  <service android:name=".LocationService" android:foregroundServiceType="location"/>
+  -->
+  <application
+    android:name=".AppStart"
+    android:usesCleartextTraffic="true"
+    android:allowBackup="true"
+    android:dataExtractionRules="@xml/data_extraction_rules"
+    android:fullBackupContent="@xml/backup_rules"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.Theme.A6_01_PermissionsPeopleWorkorders"
+    tools:targetApi="34">
+    <activity
+      android:name="de.rogallab.mobile.ui.MainActivity"
+      android:exported="true"
+      android:theme="@style/Theme.Theme.A6_01_PermissionsPeopleWorkorders">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+
+</manifest>

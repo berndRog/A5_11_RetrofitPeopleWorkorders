@@ -1,0 +1,34 @@
+<resources>
+  <string name="app_name">ManageWorkorders</string>
+  <string name="person_input">Neue Person</string>
+  <string name="person_detail">Person bearbeiten</string>
+  <string name="people_list">Personen</string>
+  <string name="personwork_overview">Arbeitsaufgabe zuweisen</string>
+  <string name="personwork_detail">Arbeitsauftrag ausführen</string>
+  <string name="firstName">Vorname</string>
+  <string name="lastName">Nachname</string>
+  <string name="email">E-Mail</string>
+  <string name="phone">Telefonnummer</string>
+  <string name="errorCharMin">2</string>
+  <string name="errorCharMax">16</string>
+  <string name="okChars">2-16 Zeichen sind erlaubt</string>
+  <string name="errorFirstNameTooShort">Vorname ist zu kurz</string>
+  <string name="errorFirstNameTooLong">Vorname ist zu lang</string>
+  <string name="errorLastNameTooShort">Nachname ist zu kurz</string>
+  <string name="errorLastNameTooLong">Nachname ist zu lang</string>
+  <string name="errorEmail">E-Mail Adresse ist unzulässig</string>
+  <string name="errorPhone">Telefonnumer ist unzulässig</string>
+  <string name="workorders_list">Übersicht Arbeitsaufträge</string>
+  <string name="workorder_input">Neuer Arbeitsauftrag</string>
+  <string name="workorder_detail">Arbeitsauftrag bearbeiten</string>
+  <string name="workstate_default"></string>
+  <string name="workstate_assigned">zugewiesen</string>
+  <string name="workstate_started">gestartet</string>
+  <string name="workstate_completed">beendet</string>
+  <string name="title">Titel</string>
+  <string name="description">Beschreibung</string>
+  <string name="remark">Anmerkung</string>
+  <string name="send">Senden</string>
+  <string name="save">Speichern</string>
+  <string name="back">Zurück</string>
+</resources>
