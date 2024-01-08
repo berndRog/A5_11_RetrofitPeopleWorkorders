@@ -17,7 +17,7 @@ class ApiKey : Interceptor {
          .header("X-API-Key",_key)
          //          .header("X-Session", getServerSession())
          .method(original.method, original.body)
-         .build();
-      return chain.proceed(request);
+         .build()
+      return chain.proceed(request)
    }
 }

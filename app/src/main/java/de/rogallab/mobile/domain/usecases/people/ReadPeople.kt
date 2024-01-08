@@ -1,11 +1,9 @@
 package de.rogallab.mobile.domain.usecases.people
 
-import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.Resource
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
-import de.rogallab.mobile.domain.mapping.toPerson
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import kotlinx.coroutines.CoroutineDispatcher
@@ -13,7 +11,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import javax.inject.Inject

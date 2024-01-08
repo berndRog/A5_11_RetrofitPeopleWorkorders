@@ -8,7 +8,7 @@ import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 
 @Composable
-fun EvalWorkorderStateAndTime(workorder: Workorder): Pair<String, String> {
+fun evalWorkorderStateAndTime(workorder: Workorder): Pair<String, String> {
 
    val context = LocalContext.current
    var time = ""

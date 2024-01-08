@@ -2,19 +2,16 @@ package de.rogallab.mobile
 
 import de.rogallab.mobile.data.IPeopleDao
 import de.rogallab.mobile.data.IPeopleWebservice
-import de.rogallab.mobile.data.repositories.PeopleRepositoryImpl
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.Resource
 import io.mockk.coEvery
 import io.mockk.mockk
 import junit.framework.TestCase.assertEquals
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 class PeopleRepositoryTest {

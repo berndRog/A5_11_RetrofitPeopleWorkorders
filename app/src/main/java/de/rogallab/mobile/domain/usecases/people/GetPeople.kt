@@ -3,13 +3,10 @@ package de.rogallab.mobile.domain.usecases.people
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.Resource
 import de.rogallab.mobile.domain.entities.Person
-import de.rogallab.mobile.domain.mapping.toPerson
-import de.rogallab.mobile.domain.usecases.apiQueryRequestAsFlow
 import de.rogallab.mobile.domain.utilities.logDebug
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import javax.inject.Inject

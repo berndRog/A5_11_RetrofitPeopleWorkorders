@@ -1,6 +1,5 @@
 package de.rogallab.mobile.domain.usecases
 
-import de.rogallab.mobile.data.repositories.PeopleRepositoryImpl
 import de.rogallab.mobile.domain.Resource
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError

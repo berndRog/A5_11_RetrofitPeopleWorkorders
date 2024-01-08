@@ -52,7 +52,7 @@ import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.composables.showErrorMessage
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.EvalWorkorderStateAndTime
+import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,7 +166,7 @@ fun WorkordersSwipeListScreen(
             state = rememberLazyListState()
          ) {
             items(items = list) { workorder ->
-               val (state, time) = EvalWorkorderStateAndTime(workorder)
+               val (state, time) = evalWorkorderStateAndTime(workorder)
 
                val dismissState = rememberDismissState(
                   confirmValueChange = {

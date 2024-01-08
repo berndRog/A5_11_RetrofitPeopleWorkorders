@@ -8,14 +8,11 @@ import android.graphics.BitmapFactory
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
-import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.Resource
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
-import de.rogallab.mobile.domain.mapping.toPersonDto
-import de.rogallab.mobile.domain.mapping.toWorkorderDto
 import de.rogallab.mobile.domain.utilities.logDebug
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler

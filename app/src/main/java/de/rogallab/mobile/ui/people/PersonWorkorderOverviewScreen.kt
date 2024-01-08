@@ -47,7 +47,7 @@ import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.EvalWorkorderStateAndTime
+import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import de.rogallab.mobile.ui.workorders.WorkordersViewModel
 import java.util.UUID
 
@@ -201,7 +201,7 @@ private fun DefaultWorkordersList(
          state = rememberLazyListState()
       ) {
          items(items = filteredWorkorder) { workorder ->
-            val (state, time) = EvalWorkorderStateAndTime(workorder)
+            val (state, time) = evalWorkorderStateAndTime(workorder)
 
             Column(Modifier.clickable {
                onAddWorkorder(workorder)
@@ -240,7 +240,7 @@ private fun AssignedWorkorders(
          state = rememberLazyListState()
       ) {
          items(items = assignedWorkorders) { workorder ->
-            val (state, time) = EvalWorkorderStateAndTime(workorder)
+            val (state, time) = evalWorkorderStateAndTime(workorder)
 
             val dismissState = rememberDismissState(
                confirmValueChange = {

@@ -42,7 +42,7 @@ import de.rogallab.mobile.ui.composables.HandleUiStateError
 import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.EvalWorkorderStateAndTime
+import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -170,7 +170,7 @@ fun WorkorderDetailScreen(
 
 
          if(workorder.state != WorkState.Default) {
-            val (state, time) = EvalWorkorderStateAndTime(workorder)
+            val (state, time) = evalWorkorderStateAndTime(workorder)
 
             Row(modifier = Modifier.padding(top=16.dp),
                horizontalArrangement = Arrangement.Absolute.Right,

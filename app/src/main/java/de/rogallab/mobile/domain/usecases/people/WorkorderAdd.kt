@@ -6,11 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
-import de.rogallab.mobile.domain.entities.Workorder
-import de.rogallab.mobile.domain.mapping.toWorkorderDto
-import de.rogallab.mobile.domain.utilities.logError
-import de.rogallab.mobile.ui.people.PeopleViewModel
 import de.rogallab.mobile.domain.entities.WorkState
+import de.rogallab.mobile.domain.entities.Workorder
+import de.rogallab.mobile.domain.utilities.logError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope

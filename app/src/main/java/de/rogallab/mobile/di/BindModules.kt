@@ -5,15 +5,12 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ViewModelComponent
 import dagger.hilt.android.scopes.ViewModelScoped
-import dagger.hilt.components.SingletonComponent
 import de.rogallab.mobile.data.repositories.PeopleRepositoryImpl
 import de.rogallab.mobile.data.repositories.WordordersRepositoryImpl
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IPeopleUseCases
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.usecases.people.PeopleUseCasesImpl
-
-import javax.inject.Singleton
 
 @InstallIn(ViewModelComponent::class)
 @Module
@@ -26,7 +23,6 @@ abstract class BindViewModelModules {
 }
 
 @Module
-//@InstallIn(SingletonComponent::class)
 @InstallIn(ViewModelComponent::class)
 interface BindSingletonModules {
    @Binds
