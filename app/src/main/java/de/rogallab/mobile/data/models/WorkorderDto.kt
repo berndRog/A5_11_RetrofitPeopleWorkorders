@@ -3,7 +3,7 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import de.rogallab.mobile.domain.utilities.as8
-import de.rogallab.mobile.domain.utilities.max
+import de.rogallab.mobile.domain.utilities.maxValues
 import de.rogallab.mobile.domain.utilities.toZuluString
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.domain.entities.WorkState
@@ -27,5 +27,5 @@ data class WorkorderDto(
    @Embedded  // Workorder -> Address [0..1]
    var address: AddressDto? = null
 ){
-   fun asString() : String = "${title.max(20)} $created $started $completed ${state} $duration $remark.max(20) ${id.as8()}"
+   fun asString() : String = "${title.maxValues(20)} $created $started $completed ${state} $duration $remark.max(20) ${id.as8()}"
 }

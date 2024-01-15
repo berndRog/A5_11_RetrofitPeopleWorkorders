@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -27,13 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.UiState
-import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.utilities.logInfo
-import de.rogallab.mobile.ui.composables.LogUiStates
-import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.composables.HandleUiStateError
+import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.SelectAndShowImage
+import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.people.composables.InputNameMailPhone
 import de.rogallab.mobile.ui.people.composables.isInputValid
 
@@ -45,6 +43,8 @@ fun PersonInputScreen(
 ) {
    val tag = "ok>PersonInputScreen  ."
 
+   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
+
    BackHandler(
       enabled = true,
       onBack = {
@@ -55,9 +55,6 @@ fun PersonInputScreen(
          )
       }
    )
-
-   val uiStatePersonFlow: UiState<Person> by viewModel.uiStatePersonFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStatePersonFlow,"UiState Person", tag )
 
    val context = LocalContext.current
    val snackbarHostState = remember { SnackbarHostState() }
@@ -72,14 +69,12 @@ fun PersonInputScreen(
                   if(! isInputValid(context, viewModel)) {
                      viewModel.add()
                   }
-                  if(viewModel.uiStatePersonFlow.value.upHandler) {
-                     logInfo(tag, "Reverse Navigation (Up), viewModel.add()")
+                  if(errorState.up) {
                      navController.navigate(route = NavScreen.PeopleList.route) {
                         popUpTo(route = NavScreen.PeopleList.route) { inclusive = true }
                      }
                   }
-                  if(viewModel.uiStatePersonFlow.value.backHandler) {
-                     logInfo(tag, "Back Navigation, Error in viewModel.add()")
+                  if(errorState.back) {
                      navController.popBackStack(
                         route = NavScreen.PeopleList.route,
                         inclusive = false
@@ -128,16 +123,22 @@ fun PersonInputScreen(
       }
    }
 
-   if (uiStatePersonFlow is UiState.Error) {
-      HandleUiStateError(
-         uiStateFlow = uiStatePersonFlow,
-         actionLabel = "Ok",
-         onErrorAction = { },
-         snackbarHostState = snackbarHostState,
-         navController = navController,
-         routePopBack = NavScreen.PeopleList.route,
-         onUiStateFlowChange = { viewModel.onUiStatePersonFlowChange(it) },
-         tag = tag
+   EventEffect(
+      event = errorState.errorEvent,
+      onHandled = viewModel::onErrorEventHandled
+   ){ errorMessage: String ->
+      snackbarHostState.showSnackbar(
+         message = errorMessage,
+         actionLabel = "ok",
+         withDismissAction = false,
+         duration = SnackbarDuration.Short
       )
+      if (errorState.back) {
+         logInfo(tag, "Back Navigation (Abort)")
+         navController.popBackStack(
+            route = NavScreen.PeopleList.route,
+            inclusive = false
+         )
+      }
    }
 }

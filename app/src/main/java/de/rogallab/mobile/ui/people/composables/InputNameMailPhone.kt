@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat.getString
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.utilities.logDebug
+import de.rogallab.mobile.ui.people.ErrorState
 import de.rogallab.mobile.ui.people.PeopleViewModel
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -394,26 +395,26 @@ fun isInputValid(context: Context, viewModel: PeopleViewModel): Boolean {
 
    if (viewModel.firstName.isEmpty() || viewModel.firstName.length < 2) {
       val message = getString(context, R.string.errorFirstNameTooShort)
-      viewModel.onUiStatePersonFlowChange(UiState.Error(message,false,false))
+      viewModel.onErrorStateChange(ErrorState(error = message, up = false, back = false))
       return true
    }
    if (viewModel.lastName.isEmpty() || viewModel.lastName.length < 2) {
       val message = getString(context, R.string.errorLastNameTooShort)
-      viewModel.onUiStatePersonFlowChange(UiState.Error(message,false,false))
+      viewModel.onErrorStateChange(ErrorState(error = message, up = false, back = false))
       return true
    }
 
    viewModel.email?.let {
       if (!android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches()) {
          val message = getString(context, R.string.errorEmail)
-         viewModel.onUiStatePersonFlowChange(UiState.Error(message,false,false))
+         viewModel.onErrorStateChange(ErrorState(error = message, up = false, back = false))
          return true
       }
    }
    viewModel.phone?.let {
       if (!android.util.Patterns.PHONE.matcher(it).matches()) {
          val message = getString(context, R.string.errorPhone)
-         viewModel.onUiStatePersonFlowChange(UiState.Error(message,false,false))
+         viewModel.onErrorStateChange(ErrorState(error = message, up = false, back = false))
          return true
       }
    }

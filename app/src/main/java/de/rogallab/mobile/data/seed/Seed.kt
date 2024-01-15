@@ -10,7 +10,7 @@ import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IWorkordersRepository
-import de.rogallab.mobile.domain.Resource
+import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
@@ -58,7 +58,7 @@ class Seed @Inject constructor(
          val resource = _peopleRepository.count()
          var countPeople = 0;
 
-         if(resource is Resource.Success) {
+         if(resource is ResultData.Success) {
             countPeople = resource.data!!
          }
 
@@ -140,7 +140,7 @@ class Seed @Inject constructor(
          lastName = "Mustermann",
          email = "e.mustermann@t-online.de",
          phone = "0987 6543-210",
-         id = UUID.fromString("10000000-0000-0000-0000-000000000000"))
+         id = UUID.fromString("24000000-0000-0000-0000-000000000000"))
       people.add(person)
 
       if(imagesUri.size == 10) {

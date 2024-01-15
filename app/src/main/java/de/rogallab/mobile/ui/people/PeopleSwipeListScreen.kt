@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismiss
@@ -44,7 +45,9 @@ import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.utilities.logDebug
+import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
+import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.HandleUiStateError
 import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.PersonCard
@@ -62,9 +65,6 @@ fun PeopleSwipeListScreen(
    viewModel: PeopleViewModel
 ) {
    val tag = "ok>PeopleListScreen   ."
-
-   val uiStatePersonFlow: UiState<Person> by viewModel.uiStatePersonFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStatePersonFlow,"UiState <Person>", tag )
 
    val uiStateListPersonFlow: UiState<List<Person>> by viewModel.uiStateListFlow.collectAsStateWithLifecycle()
    LogUiStates(uiStateListPersonFlow,"UiState List<Person>", tag )
@@ -131,8 +131,7 @@ fun PeopleSwipeListScreen(
             CircularProgressIndicator(modifier = Modifier.size(160.dp))
          }
       } else if (uiStateListPersonFlow is UiState.Success<List<Person>> ||
-         uiStateListPersonFlow is UiState.Error ||
-         uiStatePersonFlow is UiState.Error) {
+         uiStateListPersonFlow is UiState.Error ) {
 
          var list: MutableList<Person> = remember { mutableListOf<Person>() }
          if (uiStateListPersonFlow is UiState.Success) {
@@ -219,18 +218,28 @@ fun PeopleSwipeListScreen(
                tag = tag
             )
          }
-         if (uiStatePersonFlow is UiState.Error) {
-            HandleUiStateError(
-               uiStateFlow = uiStatePersonFlow,
-               actionLabel = "Ok",
-               onErrorAction = { },
-               snackbarHostState = snackbarHostState,
-               navController = navController,
-               routePopBack = NavScreen.PeopleList.route,
-               onUiStateFlowChange = { viewModel.onUiStatePersonFlowChange(it) },
-               tag = tag
+      }
+
+      val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
+      EventEffect(
+         event = errorState.errorEvent,
+         onHandled = viewModel::onErrorEventHandled
+      ){ it: String ->
+         snackbarHostState.showSnackbar(
+            message = it,
+            actionLabel = "ok",
+            withDismissAction = false,
+            duration = SnackbarDuration.Short
+         )
+         if (errorState.back) {
+            logInfo(tag, "Back Navigation (Abort)")
+            navController.popBackStack(
+               route = NavScreen.PeopleList.route,
+               inclusive = false
             )
          }
+         // reset error state
+         //viewModel.onErrorStateChange(ErrorState())
       }
    }
 }

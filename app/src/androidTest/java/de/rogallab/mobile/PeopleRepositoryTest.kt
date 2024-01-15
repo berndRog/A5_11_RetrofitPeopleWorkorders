@@ -3,7 +3,7 @@ package de.rogallab.mobile
 import de.rogallab.mobile.data.IPeopleDao
 import de.rogallab.mobile.data.IPeopleWebservice
 import de.rogallab.mobile.domain.IPeopleRepository
-import de.rogallab.mobile.domain.Resource
+import de.rogallab.mobile.domain.ResultData
 import io.mockk.coEvery
 import io.mockk.mockk
 import junit.framework.TestCase.assertEquals
@@ -32,8 +32,8 @@ class PeopleRepositoryTest {
 
       val result = repository.count()
 
-      assert(result is Resource.Success)
-      assertEquals(10, (result as Resource.Success).data)
+      assert(result is ResultData.Success)
+      assertEquals(10, (result as ResultData.Success).data)
    }
 
    @Test
@@ -42,8 +42,8 @@ class PeopleRepositoryTest {
 
       val result = repository.count()
 
-      assert(result is Resource.Error)
-      assertEquals("Network Error", (result as Resource.Error).message)
+      assert(result is ResultData.Error)
+      assertEquals("Network Error", (result as ResultData.Error).message)
    }
 
    @Test
@@ -52,7 +52,7 @@ class PeopleRepositoryTest {
 
       val result = repository.count()
 
-      assert(result is Resource.Error)
-      assertEquals("Generic Error", (result as Resource.Error).message)
+      assert(result is ResultData.Error)
+      assertEquals("Generic Error", (result as ResultData.Error).message)
    }
 }

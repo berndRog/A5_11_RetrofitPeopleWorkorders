@@ -16,4 +16,10 @@ data class Person (
    var address: Address? = null
 ) {
    fun asString() : String = "$firstName $lastName ${id.as8()}"
+
+   fun addWorkorder(workorder: Workorder) {
+      workorder.person = this
+      workorder.personId = this.id
+      workorders.add(workorder)
+   }
 }

@@ -9,22 +9,22 @@ import java.util.UUID
 interface IPeopleRepository {
 
    // database
-   fun selectAll(): Flow<Resource<List<Person>>>
-   suspend fun findById(id: UUID): Resource<Person?>
-   suspend fun count(): Resource<Int>
-   suspend fun add(person: Person): Resource<Unit>
-   suspend fun addAll(people: List<Person>): Resource<Unit>
-   suspend fun update(person: Person): Resource<Unit>
-   suspend fun remove(person: Person): Resource<Unit>
+   fun selectAll(): Flow<ResultData<List<Person>>>
+   suspend fun findById(id: UUID): ResultData<Person?>
+   suspend fun count(): ResultData<Int>
+   suspend fun add(person: Person): ResultData<Unit>
+   suspend fun addAll(people: List<Person>): ResultData<Unit>
+   suspend fun update(person: Person): ResultData<Unit>
+   suspend fun remove(person: Person): ResultData<Unit>
 
-   suspend fun selectByIdWithWorkorders(id: UUID): Person?
-   suspend fun findByIdWithWorkorders(id:UUID): Map<PersonDto, List<WorkorderDto>>
+   suspend fun selectByIdWithWorkorders(id: UUID): ResultData<Person?>
+   suspend fun findByIdWithWorkorders(id:UUID): ResultData<Person?>
 
    // Webservice
-   suspend fun getAll(): Flow<Resource<List<Person>>>
-   suspend fun getById(id: UUID): Resource<Person?>
-   suspend fun post(person: Person): Resource<Unit>
-   suspend fun put(person: Person): Resource<Unit>
-   suspend fun delete(person: Person): Resource<Unit>
+   suspend fun getAll(): Flow<ResultData<List<Person>>>
+   suspend fun getById(id: UUID): ResultData<Person?>
+   suspend fun post(person: Person): ResultData<Unit>
+   suspend fun put(person: Person): ResultData<Unit>
+   suspend fun delete(person: Person): ResultData<Unit>
 }
 

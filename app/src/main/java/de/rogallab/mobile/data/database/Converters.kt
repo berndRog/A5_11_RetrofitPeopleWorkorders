@@ -5,6 +5,7 @@ import de.rogallab.mobile.domain.utilities.formatISO
 import de.rogallab.mobile.domain.utilities.systemZoneId
 import de.rogallab.mobile.domain.utilities.toZonedDateTimeUTC
 import java.time.ZonedDateTime
+import java.util.UUID
 
 @ProvidedTypeConverter
 object ZonedDateTimeConverters {
@@ -17,6 +18,16 @@ object ZonedDateTimeConverters {
    fun zonedDateTimeToString(zdt: ZonedDateTime): String =
       toZonedDateTimeUTC(zdt).format(formatISO)
 
+}
+
+
+@ProvidedTypeConverter
+object UUIDConverter {
+   @TypeConverter
+   fun fromUUID(uuid: UUID): String = uuid.toString()
+
+   @TypeConverter
+   fun toUUID(suuid: String): UUID = UUID.fromString(suuid)
 }
 
 /*

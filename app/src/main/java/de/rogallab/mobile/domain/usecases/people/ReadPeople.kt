@@ -1,7 +1,7 @@
 package de.rogallab.mobile.domain.usecases.people
 
 import de.rogallab.mobile.domain.IPeopleRepository
-import de.rogallab.mobile.domain.Resource
+import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.utilities.logDebug
@@ -22,23 +22,25 @@ class ReadPeople @Inject constructor(
 ) {
 
    operator fun invoke(): Flow<UiState<List<Person>>> = flow {
+
       emit(UiState.Loading)
 
-      _peopleRepository.selectAll().collect { resource: Resource<List<Person>> ->
+      _peopleRepository.selectAll().collect { result: ResultData<List<Person>> ->
          delay(500)
          logDebug(tag, "ReadAll.invoke() emit success")
-         when (resource) {
-            is Resource.Success -> {
-               val people = resource.data?.sortedBy { it.lastName }
+         when (result) {
+            is ResultData.Success -> {
+               val people = result.data.sortedBy { it.lastName }
                emit(UiState.Success(data = people))
             }
-            is Resource.Error -> {
-               val message = resource.message!!
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "Unknown error"
                emit(UiState.Error(message = message))
             }
-            is Resource.Loading -> {
+            is ResultData.Loading -> {
                emit(UiState.Loading)
             }
+            else -> Unit
          }
       }
    }.catch {

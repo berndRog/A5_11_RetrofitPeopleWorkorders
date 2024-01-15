@@ -15,6 +15,9 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
+import de.rogallab.mobile.ui.composables.handled
+import de.rogallab.mobile.ui.composables.trigger
+import de.rogallab.mobile.ui.people.ErrorState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -26,9 +29,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -41,41 +46,38 @@ class WorkordersViewModel @Inject constructor(
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
+   var dbChanged: Boolean = false
+
    private var _id: UUID = UUID.randomUUID()
 
    // Observables (DataBinding)
    private var _created: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val created: ZonedDateTime
-      get() = _created
+   val created: ZonedDateTime = _created
    fun onCreatedChange(value: ZonedDateTime) {
       if(value != _created) _created = value
    }
 
    private var _title: String by mutableStateOf(value = "")
-   val title: String
-      get() = _title
+   val title: String = _title
    fun onTitleChange(value: String) {
       if(value != _title) _title = value
    }
 
    private var _description: String by mutableStateOf(value = "")
-   val description: String
-      get() = _description
+   val description: String = _description
    fun onDescriptionChange(value: String) {
       if(value != _description) _description = value
    }
 
    private var _started: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val started: ZonedDateTime
-      get() = _started
+   val started: ZonedDateTime = _started
    fun onStartedChange(value: ZonedDateTime) {
       _state = WorkState.Started
       _started = value
    }
 
    private var _completed: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val completed: ZonedDateTime
-      get() = _completed
+   val completed: ZonedDateTime = _completed
    fun onCompletedChange(value: ZonedDateTime) {
       _state = WorkState.Completed
       _completed = value
@@ -84,30 +86,24 @@ class WorkordersViewModel @Inject constructor(
    }
 
    private var _state: WorkState by mutableStateOf(WorkState.Default)
-   val state
-      get() = _state
+   val state = _state
 
    private var _duration: Duration = Duration.ZERO
 
    private var _remark: String by mutableStateOf(value = "")
-   val remark: String
-      get() = _remark
+   val remark: String = _remark
    fun onRemarkChange(value: String) {
       if(value != _remark) _remark = value
    }
 
    private var _imagePath: String? by mutableStateOf(value = null)
-   val imagePath
-      get() = _imagePath
+   val imagePath = _imagePath
    fun onImagePathChange(value: String?) {
       if(value != _imagePath )  _imagePath = value
    }
 
    private var _assignedPerson: Person? = null
-   val assignedPerson
-      get() = _assignedPerson
-
-   var dbChanged = false
+   val assignedPerson = _assignedPerson
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
@@ -141,6 +137,21 @@ class WorkordersViewModel @Inject constructor(
       _uiStateWorkordereFlow.value = uiState
       if(uiState is UiState.Error) {
          logError(tag,uiState.message)
+      }
+   }
+
+   // Error State
+   private var _stateFlowError: MutableStateFlow<ErrorState> = MutableStateFlow(ErrorState())
+   val stateFlowError: StateFlow<ErrorState> = _stateFlowError.asStateFlow()
+
+   fun triggerErrorEvent(message: String, up: Boolean, back: Boolean) {
+      _stateFlowError.update { currentState ->
+         currentState.copy(errorEvent = trigger(message), up, back)
+      }
+   }
+   fun onErrorEventHandled() {
+      _stateFlowError.update { currentState ->
+         currentState.copy(errorEvent = handled(), up = true, back = false)
       }
    }
 

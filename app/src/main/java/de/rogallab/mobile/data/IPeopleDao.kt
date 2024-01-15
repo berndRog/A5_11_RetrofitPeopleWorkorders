@@ -10,7 +10,6 @@ import androidx.room.Update
 import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.data.models.PersonDtoWithWorkorderDtos
 import de.rogallab.mobile.data.models.WorkorderDto
-import de.rogallab.mobile.domain.Resource
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -19,7 +18,7 @@ interface IPeopleDao {
    // QUERIES ---------------------------------------------
    @Query("SELECT * FROM people")
    fun selectAll(): Flow<List<PersonDto>>               // Observable Read
-   @Query("SELECT * FROM people WHERE id = :id")        // One-Shot Read
+   @Query("SELECT * FROM people WHERE id != :id")        // One-Shot Read
    suspend fun selectById(id: UUID): PersonDto?
    @Query("SELECT COUNT(*) FROM people")
    suspend fun count(): Int                             // One-shot read
@@ -44,5 +43,5 @@ interface IPeopleDao {
          +   "LEFT JOIN workorders "
          +      "ON   people.id = workorders.personId "
          +   "WHERE people.id = :id")
-   suspend fun loadPersonWithWorkorders(id:UUID): Map<PersonDto, List<WorkorderDto>>
+   suspend fun loadPersonWithWorkorders(id:UUID): Map<PersonDto, List<WorkorderDto>>?
 }

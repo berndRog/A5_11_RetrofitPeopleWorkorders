@@ -18,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismiss
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -47,8 +49,10 @@ import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.NavScreen
+import de.rogallab.mobile.ui.people.composables.ObserveAsEvents
 import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import de.rogallab.mobile.ui.workorders.WorkordersViewModel
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,10 +76,6 @@ fun PersonWorkorderOverviewScreen(
       }
    )
 
-   val uiStatePerson: UiState<Person>
-      by peopleViewModel.uiStatePersonFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStatePerson, "UiState Person", tag)
-
    val uiStateListWorkorder: UiState<List<Workorder>>
       by workordersViewModel.uiStateListWorkorderFlow.collectAsStateWithLifecycle()
    LogUiStates(uiStateListWorkorder, "UiState List<Workorder>", tag)
@@ -89,7 +89,7 @@ fun PersonWorkorderOverviewScreen(
          //workordersViewModel.readAll()
       }
    } ?: run {
-//      peopleViewModel.onUiStateFlowChange(UiState.Error("No id for person is given"))
+      peopleViewModel.onErrorStateChange(ErrorState("No id for person is given", false, true))
    }
 
    Scaffold(
@@ -98,13 +98,13 @@ fun PersonWorkorderOverviewScreen(
             title = { Text(stringResource(R.string.personwork_overview)) },
             navigationIcon = {
                IconButton(onClick = {
-                  if (peopleViewModel.uiStatePersonFlow.value.upHandler) {
+                  if (peopleViewModel.errorState.up) {
                      logInfo(tag, "Reverse Navigation (Up) viewModel.update()")
                      navController.navigate(route = NavScreen.PeopleList.route) {
                         popUpTo(route = NavScreen.PeopleList.route) { inclusive = true }
                      }
                   }
-                  if (peopleViewModel.uiStatePersonFlow.value.backHandler) {
+                  if (peopleViewModel.errorState.back) {
                      logInfo(tag, "Back Navigation, Error in viewModel.update()")
                      navController.popBackStack(
                         route = NavScreen.PeopleList.route,
@@ -165,17 +165,29 @@ fun PersonWorkorderOverviewScreen(
          )
       } // Column
 
-      if (uiStatePerson is UiState.Error) {
-         HandleUiStateError(
-            uiStateFlow = uiStatePerson,
-            actionLabel = "Ok",
-            onErrorAction = { },
-            snackbarHostState = snackbarHostState,
-            navController = navController,
-            routePopBack = NavScreen.PeopleList.route,
-            onUiStateFlowChange = { peopleViewModel.onUiStatePersonFlowChange(it) },
-            tag = tag
-         )
+      val coroutineScope = rememberCoroutineScope()
+      ObserveAsEvents(peopleViewModel.errorChannelFlow) { event: ErrorEvent ->
+         when (event) {
+            is ErrorEvent.ShowError -> {
+               coroutineScope.launch {
+                  snackbarHostState.showSnackbar(
+                     message = peopleViewModel.errorState.error ?: "unknow error",
+                     actionLabel = "ok",
+                     withDismissAction = false,
+                     duration = SnackbarDuration.Short
+                  )
+                  if (peopleViewModel.errorState.back) {
+                     logInfo(tag, "Back Navigation (Abort)")
+                     navController.popBackStack(
+                        route = NavScreen.PeopleList.route,
+                        inclusive = false
+                     )
+                  }
+                  // reset error state
+                  peopleViewModel.onErrorStateChange(ErrorState())
+               }
+            }
+         }
       }
    }
 }

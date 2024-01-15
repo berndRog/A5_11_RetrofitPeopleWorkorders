@@ -15,7 +15,7 @@ import de.rogallab.mobile.data.models.WorkorderDto
    exportSchema = false
 )
 
-@TypeConverters(ZonedDateTimeConverters::class)
+@TypeConverters(ZonedDateTimeConverters::class, UUIDConverter::class)
 
 abstract class AppDatabase : RoomDatabase() {
 

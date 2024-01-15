@@ -90,7 +90,7 @@ dependencies {
 
    // Lifecycle,
    // https://developer.android.com/jetpack/androidx/releases/lifecycle
-   val lifecycleVersion = "2.6.2"
+   val lifecycleVersion = "2.7.0"
    // val archVersion = "2.2.0"
    // ViewModel
    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
@@ -160,6 +160,7 @@ dependencies {
 
    // TESTS -----------------------
    testImplementation("junit:junit:4.13.2")
+   testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
 
    // ANDROID TESTS ---------------
    // https://developer.android.com/jetpack/androidx/releases/test

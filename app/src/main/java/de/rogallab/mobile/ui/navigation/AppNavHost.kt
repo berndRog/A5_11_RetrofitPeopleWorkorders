@@ -15,8 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import de.rogallab.mobile.ui.people.PeopleSwipeListScreen
 import de.rogallab.mobile.ui.people.PeopleViewModel
-import de.rogallab.mobile.ui.people.PersonDetailScreen
-import de.rogallab.mobile.ui.people.PersonInputScreen
+import de.rogallab.mobile.ui.people.PersonScreen
 import de.rogallab.mobile.ui.people.PersonWorkorderDetailScreen
 import de.rogallab.mobile.ui.people.PersonWorkorderOverviewScreen
 import de.rogallab.mobile.ui.workorders.WorkorderDetailScreen
@@ -31,7 +30,7 @@ fun AppNavHost(
    workordersViewModel: WorkordersViewModel = hiltViewModel()
 ) {
    val navHostController: NavHostController = rememberNavController()
-   val duration = 800  // in ms
+   val duration = 500  // in ms
 
    NavHost(
       navController = navHostController,
@@ -50,7 +49,9 @@ fun AppNavHost(
       }
 
       composable(NavScreen.PersonInput.route) {
-         PersonInputScreen(
+         PersonScreen(
+            isDetail = false,
+            id = null,
             navController = navHostController,
             viewModel = peopleViewModel
          )
@@ -63,7 +64,8 @@ fun AppNavHost(
          val id = backStackEntry.arguments?.getString("personId")?.let {
             UUID.fromString(it)
          }
-         PersonDetailScreen(
+         PersonScreen(
+            isDetail = true,
             id = id,
             navController = navHostController,
             viewModel = peopleViewModel

@@ -1,7 +1,7 @@
 package de.rogallab.mobile.domain.usecases.people
 
 import de.rogallab.mobile.domain.IPeopleRepository
-import de.rogallab.mobile.domain.Resource
+import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.utilities.logDebug
 import kotlinx.coroutines.CoroutineDispatcher
@@ -16,14 +16,14 @@ class GetPeople @Inject constructor(
    private val _dispatcher: CoroutineDispatcher,
    private val _exceptionHandler: CoroutineExceptionHandler
 ) {
-   operator fun invoke(): Flow<Resource<List<Person>>> = flow {
+   operator fun invoke(): Flow<ResultData<List<Person>>> = flow {
       logDebug(tag,"invoke()")
-      emit(Resource.Loading<List<Person>>(true))
+      emit(ResultData.Loading(true))
 
 
       // make the api call
 
-         _peopleRepository.getAll().collect{ it: Resource<List<Person>> ->
+         _peopleRepository.getAll().collect{ it: ResultData<List<Person>> ->
 
 
             emit(it)

@@ -8,13 +8,14 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IPeopleUseCases
-import de.rogallab.mobile.domain.Resource
-import de.rogallab.mobile.domain.StateUiScreen
+import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
+import de.rogallab.mobile.ui.composables.handled
+import de.rogallab.mobile.ui.composables.trigger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -24,8 +25,10 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -37,76 +40,68 @@ class PeopleViewModel @Inject constructor(
    dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
+   var isDetail: Boolean = false
+   var dbChanged: Boolean = false
+
    private var _id: UUID = UUID.randomUUID()
-   val id
-      get() = _id
+   val id = _id
 
    // State = Observables (DataBinding)
-   private var _firstName: String by mutableStateOf(value = "")
-   val firstName
-      get() = _firstName
+   private var _firstName: String by mutableStateOf("")
+   val firstName = _firstName
    fun onFirstNameChange(value: String) {
-      if(value != _firstName )  _firstName = value 
+      if (value != _firstName) _firstName = value
    }
 
-   private var _lastName: String by mutableStateOf(value = "")
-   val lastName
-      get() = _lastName
+   private var _lastName: String by mutableStateOf("")
+   val lastName = _lastName
    fun onLastNameChange(value: String) {
-      if(value != _lastName )  _lastName = value
+      if (value != _lastName) _lastName = value
    }
 
-   private var _email: String? by mutableStateOf(value = null)
-   val email
-      get() = _email
+   private var _email: String? by mutableStateOf(null)
+   val email = _email
    fun onEmailChange(value: String) {
-      if(value != _email )  _email = value
+      if (value != _email) _email = value
    }
 
-   private var _phone: String? by mutableStateOf(value = null)
-   val phone
-      get() = _phone
+   private var _phone: String? by mutableStateOf(null)
+   val phone= _phone
    fun onPhoneChange(value: String) {
-      if(value != _phone )  _phone = value
+      if (value != _phone) _phone = value
    }
 
-   private var _imagePath: String? by mutableStateOf(value = null)
-   val imagePath
-      get() = _imagePath
+   private var _imagePath: String? by mutableStateOf(null)
+   val imagePath = _imagePath
    fun onImagePathChange(value: String?) {
-      if(value != _imagePath )  _imagePath = value
+      if (value != _imagePath) _imagePath = value
    }
 
-   private var _workorders: MutableList<Workorder> by mutableStateOf(value = mutableListOf<Workorder>())
-   val workorders
-      get() = _workorders
+   private var _workorders: MutableList<Workorder> by mutableStateOf(mutableListOf<Workorder>())
+   val workorders = _workorders
 
    fun addWorkorder(workorder: Workorder) {
       try {
          val person = getPersonFromState(id)
          _useCases.workorderAdd(person, workorder)
-      } catch(e:Exception) {
+      }
+      catch (e: Exception) {
          val message = e.localizedMessage ?: e.stackTraceToString()
          logError(tag, message)
-         _uiStatePersonFlow.value = UiState.Error(message, false, true)
+         triggerErrorEvent(message = message, up = false, back = true)
       }
    }
+
    fun removeWorkorder(workorder: Workorder) {
       try {
          val person = getPersonFromState(id)
          _useCases.workorderRemove(person, workorder)
-      } catch(e:Exception) {
+      }
+      catch (e: Exception) {
          val message = e.localizedMessage ?: e.stackTraceToString()
          logError(tag, message)
-         _uiStatePersonFlow.value = UiState.Error(message, false, true)
+         triggerErrorEvent(message = message, up = false, back = true)
       }
-   }
-
-   private var _dbChanged = false
-   val dbChanged
-      get() = _dbChanged
-   fun onDbChanged(value: Boolean) {
-      _dbChanged = value
    }
 
    // error handling
@@ -117,9 +112,9 @@ class PeopleViewModel @Inject constructor(
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
-      exception.localizedMessage?.let {
-         logError(tag, it)
-         _uiStatePersonFlow.value = UiState.Error(it, true)
+      exception.localizedMessage?.let { message ->
+         logError(tag, message)
+         triggerErrorEvent(message = message, up = false, back = false)
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -133,7 +128,7 @@ class PeopleViewModel @Inject constructor(
 
    override fun onCleared() {
       // cancel all coroutines, when lifecycle of the viewmodel ends
-      logDebug(tag,"Cancel all child coroutines")
+      logDebug(tag, "Cancel all child coroutines")
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
@@ -141,19 +136,7 @@ class PeopleViewModel @Inject constructor(
    // mutableStateList with observer
    // var snapShotPeople: SnapshotStateList<Person> = mutableStateListOf<Person>()
 
-   // StateFlow for Input&Detail Screens
-   private var _uiStatePersonFlow: MutableStateFlow<UiState<Person>> =
-      MutableStateFlow(value = UiState.Empty)
-   val uiStatePersonFlow: StateFlow<UiState<Person>>
-      get() = _uiStatePersonFlow
-   fun onUiStatePersonFlowChange(uiState: UiState<Person>) {
-      _uiStatePersonFlow.value = uiState
-      if(uiState is UiState.Error) {
-         logError(tag,uiState.message)
-      }
-   }
    // StateFlow for List Screens
-
    val uiStateListFlow: StateFlow<UiState<List<Person>>> = flow {
       _useCases.readPeople().collect { it ->
          emit(it)
@@ -164,107 +147,162 @@ class PeopleViewModel @Inject constructor(
       UiState.Empty
    )
 
-   var state: StateUiScreen<List<Person>> by mutableStateOf(value = StateUiScreen<List<Person>>())
+   // Error State
+   private var _stateFlowError: MutableStateFlow<ErrorState> = MutableStateFlow(ErrorState())
+   val stateFlowError: StateFlow<ErrorState> = _stateFlowError.asStateFlow()
 
-   val uiflow: StateFlow<StateUiScreen<List<Person>>> = flow<StateUiScreen<List<Person>>> {
-      _useCases.getPeople().collect { result: Resource<List<Person>> ->
+   fun triggerErrorEvent(message: String, up: Boolean, back: Boolean) {
+      _stateFlowError.update { currentState ->
+         currentState.copy(errorEvent = trigger(message), up, back)
+      }
+   }
+   fun onErrorEventHandled() {
+      _stateFlowError.update { currentState ->
+         currentState.copy(errorEvent = handled(), up = true, back = false)
+      }
+   }
+
+   // StateFlow for List Screens
+   private var _stateFlowPeopleUi: MutableStateFlow<PeopleListUiState> =
+      MutableStateFlow(value = PeopleListUiState())
+   val stateFlowPeople: StateFlow<PeopleListUiState>
+      get() = _stateFlowPeopleUi
+
+   private var _statePeople: PeopleListUiState by mutableStateOf(value = PeopleListUiState())
+
+   val peopleFlow: StateFlow<PeopleListUiState> = flow {
+      _useCases.getPeople().collect { result: ResultData<List<Person>> ->
          when (result) {
-            is Resource.Loading -> {
-               state = state.copy(isLoading = true)
-               emit(state)
+            is ResultData.Loading -> {
+               _statePeople = _statePeople.copy(isLoading = true)
+               emit(_statePeople)
             }
-            is Resource.Success -> {
+
+            is ResultData.Success -> {
                result.data?.let { people: List<Person> ->
-                  state = state.copy(data = people)
-                  emit(state)
+                  _statePeople = _statePeople.copy(people = people)
+                  logDebug(tag, "uiflow: ${people.size}")
+                  emit(_statePeople)
                }
             }
-            else -> {
 
+            is ResultData.Failure -> {
+               _statePeople = _statePeople.copy(error = result.errorMessageOrNull()
+                  ?: "Unknown error")
+               emit(_statePeople)
             }
+
+            else -> Unit
          }
       }
    }.stateIn(
       viewModelScope,
       SharingStarted.WhileSubscribed(1_000),
-      StateUiScreen()
+      PeopleListUiState()
    )
 
    fun readById(id: UUID) {
       _coroutineScope.launch {
          when (val result = _peopleRepository.findById(id)) {
-            is Resource.Success -> {
+            is ResultData.Success -> {
                result.data?.let { person: Person ->
                   setStateFromPerson(person)
-                  _dbChanged = false
-                  _uiStatePersonFlow.value = UiState.Success(person)
+                  dbChanged = false
                }
             }
-            is Resource.Error -> {
-               _uiStatePersonFlow.value = UiState.Error(result.message!!, true)
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "Unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
             }
+
             else -> Unit
          }
       }
    }
 
-   fun readByIdWithWorkorders(id:UUID) {
+   fun readByIdWithWorkorders(id: UUID) {
+      _coroutineScope.launch {
+         when (val result = _peopleRepository.selectByIdWithWorkorders(id)) {
+            is ResultData.Success -> {
+               result.data?.let { person: Person ->
+                  setStateFromPerson(person)
+                  dbChanged = false
+               }
+            }
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "Unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
 
-         //_peopleRepository.selectByIdWithWorkorders(id)
-
+            else -> Unit
+         }
+      }
    }
 
    fun add(p: Person? = null) {
       val person = p ?: getPersonFromState()
       _coroutineScope.launch {
-        val resource = _peopleRepository.add(person)
-//      val resource = _peopleRepository.post(person)
-         when(resource){
-            is Resource.Success -> {
-               _dbChanged = true
+         val result = _peopleRepository.add(person)
+//       val resource = _peopleRepository.post(person)
+         when (result) {
+            is ResultData.Success -> {
+               dbChanged = true
             }
-            is Resource.Error -> {
-               state = state.copy(error = resource.message!!)
+
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
             }
+
             else -> Unit
          }
       }
    }
 
-   fun update(id:UUID) {
+   fun update(id: UUID) {
       val person = getPersonFromState(id)
       _coroutineScope.launch {
-         val resource: Resource<Unit> = _peopleRepository.update(person)
-//       val resource: Resource<Unit> = _peopleRepository.put(person)
-         when(resource) {
-            is Resource.Success -> {
-               _dbChanged = true
+         val result = _peopleRepository.update(person)
+//       val result = _peopleRepository.put(person)
+         when (result) {
+            is ResultData.Success -> {
+               dbChanged = true
             }
-            is Resource.Error -> {
-               state = state.copy(error = resource.message!!)
+
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
             }
+
             else -> Unit
          }
       }
    }
 
-   fun remove(id:UUID) {
+   fun remove(id: UUID) {
       _coroutineScope.launch {
          val person = getPersonFromState(id)
-         val resource: Resource<Unit> = _peopleRepository.remove(person)
-         when(resource) {
-            is Resource.Success -> {
-               _dbChanged = true
+         val result: ResultData<Unit> = _peopleRepository.remove(person)
+         when (result) {
+            is ResultData.Success -> {
+               dbChanged = true
             }
-            is Resource.Error -> {
-               state = state.copy(error = resource.message!!)
+
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               triggerErrorEvent(message = message, up = false, back = true)
             }
+
             else -> Unit
          }
       }
    }
 
-   private fun getPersonFromState(id:UUID? = null): Person =
+   private fun getPersonFromState(id: UUID? = null): Person =
       id?.let {
          return@let Person(_firstName, _lastName, _email, _phone, _imagePath, id, _workorders)
       } ?: run {
@@ -272,23 +310,23 @@ class PeopleViewModel @Inject constructor(
       }
 
    private fun setStateFromPerson(person: Person) {
-      _firstName  = person.firstName
-      _lastName   = person.lastName
-      _email      = person.email
-      _phone      = person.phone
-      _imagePath  = person.imagePath
-      _id         = person.id
+      _firstName = person.firstName
+      _lastName = person.lastName
+      _email = person.email
+      _phone = person.phone
+      _imagePath = person.imagePath
+      _id = person.id
       _workorders = person.workorders
    }
 
    fun clearState() {
       logDebug(tag, "clearState")
-      _firstName  = ""
-      _lastName   = ""
-      _email      = null
-      _phone      = null
-      _imagePath  = null
-      _id         = UUID.randomUUID()
+      _firstName = ""
+      _lastName = ""
+      _email = null
+      _phone = null
+      _imagePath = null
+      _id = UUID.randomUUID()
       _workorders = mutableListOf()
    }
 
@@ -296,16 +334,3 @@ class PeopleViewModel @Inject constructor(
       private const val tag = "ok>PeopleViewModel    ."
    }
 }
-
-
-data class PeopleListState(
-   val people: List<Person> = emptyList(),
-   val isLoading: Boolean = false,
-   val error: String = ""
-)
-
-data class PersonDetailState(
-   val person: Person = Person(),
-   val isLoading: Boolean = false,
-   val error: String = ""
-)
