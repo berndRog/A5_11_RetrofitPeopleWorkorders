@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IPeopleUseCases
+import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
@@ -36,7 +37,8 @@ import javax.inject.Inject
 @HiltViewModel
 class PeopleViewModel @Inject constructor(
    private val _useCases: IPeopleUseCases,
-   private val _peopleRepository: IPeopleRepository,
+   private val _repository: IPeopleRepository,
+   private val _workordersRepository: IWorkordersRepository,
    dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -44,71 +46,46 @@ class PeopleViewModel @Inject constructor(
    var dbChanged: Boolean = false
 
    private var _id: UUID = UUID.randomUUID()
-   val id = _id
+   val id
+      get() = _id
 
    // State = Observables (DataBinding)
    private var _firstName: String by mutableStateOf("")
-   val firstName = _firstName
+   val firstName: String
+      get() = _firstName
    fun onFirstNameChange(value: String) {
       if (value != _firstName) _firstName = value
    }
 
    private var _lastName: String by mutableStateOf("")
-   val lastName = _lastName
+   val lastName: String
+      get() = _lastName
    fun onLastNameChange(value: String) {
       if (value != _lastName) _lastName = value
    }
 
    private var _email: String? by mutableStateOf(null)
-   val email = _email
+   val email: String?
+      get() = _email
    fun onEmailChange(value: String) {
       if (value != _email) _email = value
    }
 
    private var _phone: String? by mutableStateOf(null)
-   val phone= _phone
+   val phone: String?
+      get() = _phone
    fun onPhoneChange(value: String) {
       if (value != _phone) _phone = value
    }
 
    private var _imagePath: String? by mutableStateOf(null)
-   val imagePath = _imagePath
+   val imagePath: String?
+      get() = _imagePath
    fun onImagePathChange(value: String?) {
       if (value != _imagePath) _imagePath = value
    }
 
-   private var _workorders: MutableList<Workorder> by mutableStateOf(mutableListOf<Workorder>())
-   val workorders = _workorders
-
-   fun addWorkorder(workorder: Workorder) {
-      try {
-         val person = getPersonFromState(id)
-         _useCases.workorderAdd(person, workorder)
-      }
-      catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag, message)
-         triggerErrorEvent(message = message, up = false, back = true)
-      }
-   }
-
-   fun removeWorkorder(workorder: Workorder) {
-      try {
-         val person = getPersonFromState(id)
-         _useCases.workorderRemove(person, workorder)
-      }
-      catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag, message)
-         triggerErrorEvent(message = message, up = false, back = true)
-      }
-   }
-
-   // error handling
-   fun onErrorAction() {
-      logDebug(tag, "onErrorAction()")
-      // toDo
-   }
+   private var _person: Person? = null
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
@@ -132,9 +109,6 @@ class PeopleViewModel @Inject constructor(
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-
-   // mutableStateList with observer
-   // var snapShotPeople: SnapshotStateList<Person> = mutableStateListOf<Person>()
 
    // StateFlow for List Screens
    val uiStateListFlow: StateFlow<UiState<List<Person>>> = flow {
@@ -161,6 +135,12 @@ class PeopleViewModel @Inject constructor(
          currentState.copy(errorEvent = handled(), up = true, back = false)
       }
    }
+   // error handling
+   fun onErrorAction() {
+      logDebug(tag, "onErrorAction()")
+      // toDo
+   }
+
 
    // StateFlow for List Screens
    private var _stateFlowPeopleUi: MutableStateFlow<PeopleListUiState> =
@@ -177,13 +157,11 @@ class PeopleViewModel @Inject constructor(
                _statePeople = _statePeople.copy(isLoading = true)
                emit(_statePeople)
             }
-
             is ResultData.Success -> {
-               result.data?.let { people: List<Person> ->
-                  _statePeople = _statePeople.copy(people = people)
-                  logDebug(tag, "uiflow: ${people.size}")
-                  emit(_statePeople)
-               }
+               val people: List<Person> = result.data
+               _statePeople = _statePeople.copy(people = people)
+               logDebug(tag, "uiflow: ${people.size}")
+               emit(_statePeople)
             }
 
             is ResultData.Failure -> {
@@ -191,8 +169,6 @@ class PeopleViewModel @Inject constructor(
                   ?: "Unknown error")
                emit(_statePeople)
             }
-
-            else -> Unit
          }
       }
    }.stateIn(
@@ -203,7 +179,7 @@ class PeopleViewModel @Inject constructor(
 
    fun readById(id: UUID) {
       _coroutineScope.launch {
-         when (val result = _peopleRepository.findById(id)) {
+         when (val result = _repository.findById(id)) {
             is ResultData.Success -> {
                result.data?.let { person: Person ->
                   setStateFromPerson(person)
@@ -215,27 +191,6 @@ class PeopleViewModel @Inject constructor(
                logError(tag, message)
                triggerErrorEvent(message = message, up = false, back = true)
             }
-
-            else -> Unit
-         }
-      }
-   }
-
-   fun readByIdWithWorkorders(id: UUID) {
-      _coroutineScope.launch {
-         when (val result = _peopleRepository.selectByIdWithWorkorders(id)) {
-            is ResultData.Success -> {
-               result.data?.let { person: Person ->
-                  setStateFromPerson(person)
-                  dbChanged = false
-               }
-            }
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "Unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
-
             else -> Unit
          }
       }
@@ -244,19 +199,16 @@ class PeopleViewModel @Inject constructor(
    fun add(p: Person? = null) {
       val person = p ?: getPersonFromState()
       _coroutineScope.launch {
-         val result = _peopleRepository.add(person)
 //       val resource = _peopleRepository.post(person)
-         when (result) {
+         when (val result = _repository.add(person)) {
             is ResultData.Success -> {
                dbChanged = true
             }
-
             is ResultData.Failure -> {
                val message = result.errorMessageOrNull() ?: "unknown error"
                logError(tag, message)
                triggerErrorEvent(message = message, up = false, back = true)
             }
-
             else -> Unit
          }
       }
@@ -265,38 +217,90 @@ class PeopleViewModel @Inject constructor(
    fun update(id: UUID) {
       val person = getPersonFromState(id)
       _coroutineScope.launch {
-         val result = _peopleRepository.update(person)
 //       val result = _peopleRepository.put(person)
-         when (result) {
+         when (val result: ResultData<Unit> = _repository.update(person)) {
             is ResultData.Success -> {
                dbChanged = true
             }
-
             is ResultData.Failure -> {
                val message = result.errorMessageOrNull() ?: "unknown error"
                logError(tag, message)
                triggerErrorEvent(message = message, up = false, back = true)
             }
-
             else -> Unit
          }
       }
    }
 
    fun remove(id: UUID) {
+      val person = getPersonFromState(id)
       _coroutineScope.launch {
-         val person = getPersonFromState(id)
-         val result: ResultData<Unit> = _peopleRepository.remove(person)
-         when (result) {
+         when(val result: ResultData<Unit> = _repository.remove(person)) {
             is ResultData.Success -> {
                dbChanged = true
             }
-
             is ResultData.Failure -> {
                val message = result.errorMessageOrNull() ?: "unknown error"
                triggerErrorEvent(message = message, up = false, back = true)
             }
+            else -> Unit
+         }
+      }
+   }
 
+   // workorder for the actual person
+   private var _workorders: MutableList<Workorder> by mutableStateOf(value = mutableListOf<Workorder>())
+   val workorders = _workorders
+
+   fun readByIdWithWorkorders(id: UUID) {
+      _coroutineScope.launch {
+         when (val result = _repository.selectByIdWithWorkorders(id)) {
+            is ResultData.Success -> {
+               result.data?.let { person: Person ->
+                  setStateFromPerson(person)
+                  _person = person
+                  dbChanged = false
+               }
+            }
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "Unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+            else -> Unit
+         }
+      }
+   }
+
+   // add workorder to person and change state to WorkState.Assigned
+   fun addWorkorder(workorder: Workorder) {
+
+      _person?.addWorkorder(workorder)
+
+      _coroutineScope.launch {
+         when (val result = _workordersRepository.update(workorder)) {
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "Unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+            else -> Unit
+         }
+      }
+   }
+
+   // remove workorder from person and change state to WorkState.Default
+   fun removeWorkorder(workorder: Workorder) {
+
+      _person?.removeWorkorder(workorder)
+
+      _coroutineScope.launch {
+         when (val result = _workordersRepository.update(workorder)) {
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "Unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
             else -> Unit
          }
       }
@@ -327,6 +331,7 @@ class PeopleViewModel @Inject constructor(
       _phone = null
       _imagePath = null
       _id = UUID.randomUUID()
+      _person = null
       _workorders = mutableListOf()
    }
 

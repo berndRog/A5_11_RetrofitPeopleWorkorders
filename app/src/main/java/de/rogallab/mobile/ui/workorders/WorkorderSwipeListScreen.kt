@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismiss
@@ -44,6 +45,7 @@ import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
+import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.HandleUiStateError
 import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.SetCardElevation
@@ -52,6 +54,7 @@ import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.composables.showErrorMessage
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
+import de.rogallab.mobile.ui.people.ErrorState
 import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import kotlinx.coroutines.launch
 
@@ -64,6 +67,8 @@ fun WorkordersSwipeListScreen(
 ) {         //12345678901234567890123
    val tag = "ok>WorkordersListScr  ."
 
+   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
+
    BackHandler(
       enabled = true,
       onBack = {
@@ -74,9 +79,6 @@ fun WorkordersSwipeListScreen(
          )
       }
    )
-
-   val uiStateWorkorderFlow: UiState<Workorder> by viewModel.uiStateWorkorderFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStateWorkorderFlow,"UiState Workorder", tag )
 
    val uiStateListWorkorderFlow: UiState<List<Workorder>> by viewModel.uiStateListWorkorderFlow.collectAsStateWithLifecycle()
    LogUiStates(uiStateListWorkorderFlow,"UiState List<Workorder>", tag )
@@ -145,8 +147,7 @@ fun WorkordersSwipeListScreen(
             CircularProgressIndicator(modifier = Modifier.size(160.dp))
          }
       } else if (uiStateListWorkorderFlow is UiState.Success<List<Workorder>> ||
-         uiStateListWorkorderFlow is UiState.Error ||
-         uiStateWorkorderFlow is UiState.Error) {
+         uiStateListWorkorderFlow is UiState.Error) {
 
          var list: MutableList<Workorder> = remember { mutableListOf() }
          if (uiStateListWorkorderFlow is UiState.Success) {
@@ -230,19 +231,25 @@ fun WorkordersSwipeListScreen(
                tag = tag
             )
          }
-         if (uiStateWorkorderFlow is UiState.Error) {
-            HandleUiStateError(
-               uiStateFlow = uiStateWorkorderFlow,
-               actionLabel = "Ok",
-               onErrorAction = { },
-               snackbarHostState = snackbarHostState,
-               navController = navController,
-               routePopBack = NavScreen.WorkordersList.route,
-               onUiStateFlowChange = { viewModel.onUiStateWorkorderFlowChange(it) },
-               tag = tag
+      }
+
+      EventEffect(
+         event = errorState.errorEvent,
+         onHandled = viewModel::onErrorEventHandled
+      ) { errorMessage: String ->
+         snackbarHostState.showSnackbar(
+            message = errorMessage,
+            actionLabel = "ok",
+            withDismissAction = false,
+            duration = SnackbarDuration.Short
+         )
+         if (errorState.back) {
+            logInfo(tag, "Back Navigation (Abort)")
+            navController.popBackStack(
+               route = NavScreen.WorkordersList.route,
+               inclusive = false
             )
          }
-
       }
    }
 }

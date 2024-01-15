@@ -18,7 +18,7 @@ import de.rogallab.mobile.ui.people.PeopleViewModel
 import de.rogallab.mobile.ui.people.PersonScreen
 import de.rogallab.mobile.ui.people.PersonWorkorderDetailScreen
 import de.rogallab.mobile.ui.people.PersonWorkorderOverviewScreen
-import de.rogallab.mobile.ui.workorders.WorkorderDetailScreen
+import de.rogallab.mobile.ui.workorders.WorkorderScreen
 import de.rogallab.mobile.ui.workorders.WorkorderInputScreen
 import de.rogallab.mobile.ui.workorders.WorkordersSwipeListScreen
 import de.rogallab.mobile.ui.workorders.WorkordersViewModel
@@ -50,7 +50,7 @@ fun AppNavHost(
 
       composable(NavScreen.PersonInput.route) {
          PersonScreen(
-            isDetail = false,
+            isInputScreen = true,
             id = null,
             navController = navHostController,
             viewModel = peopleViewModel
@@ -65,7 +65,7 @@ fun AppNavHost(
             UUID.fromString(it)
          }
          PersonScreen(
-            isDetail = true,
+            isInputScreen = false,
             id = id,
             navController = navHostController,
             viewModel = peopleViewModel
@@ -82,8 +82,7 @@ fun AppNavHost(
          PersonWorkorderOverviewScreen(
             personId = id,
             navController = navHostController,
-            peopleViewModel = peopleViewModel,
-            workordersViewModel = workordersViewModel
+            viewModel = peopleViewModel
          )
       }
 
@@ -113,7 +112,9 @@ fun AppNavHost(
       composable(
          route = NavScreen.WorkorderInput.route,
       ) {
-         WorkorderInputScreen(
+         WorkorderScreen(
+            isInputScreen = false,
+            id = null,
             navController = navHostController,
             viewModel = workordersViewModel
          )
@@ -126,7 +127,8 @@ fun AppNavHost(
          val id = backStackEntry.arguments?.getString("taskId")?.let {
             UUID.fromString(it)
          }
-         WorkorderDetailScreen(
+         WorkorderScreen(
+            isInputScreen = false,
             id = id,
             navController = navHostController,
             viewModel = workordersViewModel,

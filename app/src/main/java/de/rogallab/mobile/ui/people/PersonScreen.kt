@@ -21,7 +21,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,18 +43,18 @@ import java.util.UUID
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonScreen(
-   isDetail: Boolean,
+   isInputScreen : Boolean,
    id: UUID?,
    navController: NavController,
    viewModel: PeopleViewModel,
 ) {
    var tag = "ok>PersonInputScreen ."
+   val isInput:Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
 
    val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
-   if (isDetail) {
+   if (! isInput) {
       tag = "ok>PersonDetailScreen ."
-
       id?.let {
          LaunchedEffect(Unit) {
             logDebug(tag, "ReadById()")
@@ -85,7 +87,7 @@ fun PersonScreen(
             navigationIcon = {
                IconButton(onClick = {
                   if (!isInputValid(context, viewModel)) {
-                     if(isDetail) viewModel.update(id!!) else viewModel.add()
+                     if(isInput) viewModel.add() else viewModel.update(id!!)
                   }
                   if (errorState.up) {
                      navController.navigate(route = NavScreen.PeopleList.route) {

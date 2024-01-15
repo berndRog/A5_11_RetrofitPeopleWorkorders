@@ -18,8 +18,16 @@ data class Person (
    fun asString() : String = "$firstName $lastName ${id.as8()}"
 
    fun addWorkorder(workorder: Workorder) {
+      workorder.state = WorkState.Assigned
       workorder.person = this
       workorder.personId = this.id
       workorders.add(workorder)
+   }
+
+   fun removeWorkorder(workorder: Workorder) {
+      workorder.state = WorkState.Default
+      workorder.person = null
+      workorder.personId = null
+      workorders.remove(workorder)
    }
 }

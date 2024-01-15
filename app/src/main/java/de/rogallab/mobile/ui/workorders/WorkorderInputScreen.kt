@@ -61,9 +61,6 @@ fun WorkorderInputScreen(
       }
    )
 
-   val uiStateWorkorderFlow by viewModel.uiStateWorkorderFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStateWorkorderFlow,"UiState Workorder", tag )
-
    val snackbarHostState = remember { SnackbarHostState() }
 
    Scaffold(
@@ -138,17 +135,5 @@ fun WorkorderInputScreen(
          }
       }
 
-      if (uiStateWorkorderFlow is UiState.Error) {
-         HandleUiStateError(
-            uiStateFlow = uiStateWorkorderFlow,
-            actionLabel = "Ok",
-            onErrorAction = { },
-            snackbarHostState = snackbarHostState,
-            navController = navController,
-            routePopBack = NavScreen.WorkordersList.route,
-            onUiStateFlowChange = { viewModel.onUiStateWorkorderFlowChange(it) },
-            tag = tag
-         )
-      }
    }
 }

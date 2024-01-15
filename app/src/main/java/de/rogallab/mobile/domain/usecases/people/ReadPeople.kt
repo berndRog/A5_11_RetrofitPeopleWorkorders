@@ -40,7 +40,6 @@ class ReadPeople @Inject constructor(
             is ResultData.Loading -> {
                emit(UiState.Loading)
             }
-            else -> Unit
          }
       }
    }.catch {

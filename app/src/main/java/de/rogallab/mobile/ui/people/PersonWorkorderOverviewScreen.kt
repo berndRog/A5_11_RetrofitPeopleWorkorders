@@ -29,30 +29,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.UiState
-import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
-import de.rogallab.mobile.ui.composables.HandleUiStateError
-import de.rogallab.mobile.ui.composables.LogUiStates
+import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.ObserveAsEvents
 import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
-import de.rogallab.mobile.ui.workorders.WorkordersViewModel
-import kotlinx.coroutines.launch
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,10 +53,11 @@ import java.util.UUID
 fun PersonWorkorderOverviewScreen(
    personId: UUID?,
    navController: NavController,
-   peopleViewModel: PeopleViewModel,
-   workordersViewModel: WorkordersViewModel
+   viewModel: PeopleViewModel
 ) {         //1234567890123456780123
    val tag = "ok>PersonWorkOverview."
+
+   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
    BackHandler(
       enabled = true,
@@ -76,21 +70,18 @@ fun PersonWorkorderOverviewScreen(
       }
    )
 
-   val uiStateListWorkorder: UiState<List<Workorder>>
-      by workordersViewModel.uiStateListWorkorderFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStateListWorkorder, "UiState List<Workorder>", tag)
-
-   val snackbarHostState = remember { SnackbarHostState() }
-
    personId?.let {
-      LaunchedEffect(peopleViewModel.dbChanged) {
+      LaunchedEffect(viewModel.dbChanged) {
          logDebug(tag, "readByIdWithWorkorders()")
-         peopleViewModel.readByIdWithWorkorders(personId)
+         viewModel.readByIdWithWorkorders(personId)
          //workordersViewModel.readAll()
       }
    } ?: run {
-      peopleViewModel.onErrorStateChange(ErrorState("No id for person is given", false, true))
+      viewModel.triggerErrorEvent(
+         message ="No id for person is given", up = false, back = true)
    }
+
+   val snackbarHostState = remember { SnackbarHostState() }
 
    Scaffold(
       topBar = {
@@ -98,13 +89,13 @@ fun PersonWorkorderOverviewScreen(
             title = { Text(stringResource(R.string.personwork_overview)) },
             navigationIcon = {
                IconButton(onClick = {
-                  if (peopleViewModel.errorState.up) {
+                  if (errorState.up) {
                      logInfo(tag, "Reverse Navigation (Up) viewModel.update()")
                      navController.navigate(route = NavScreen.PeopleList.route) {
                         popUpTo(route = NavScreen.PeopleList.route) { inclusive = true }
                      }
                   }
-                  if (peopleViewModel.errorState.back) {
+                  if (errorState.back) {
                      logInfo(tag, "Back Navigation, Error in viewModel.update()")
                      navController.popBackStack(
                         route = NavScreen.PeopleList.route,
@@ -138,55 +129,41 @@ fun PersonWorkorderOverviewScreen(
             .fillMaxWidth()
       ) {
          PersonCard(
-            firstName = peopleViewModel.firstName,
-            lastName = peopleViewModel.lastName,
-            email = peopleViewModel.email,
-            phone = peopleViewModel.phone,
-            imagePath = peopleViewModel.imagePath
+            firstName = viewModel.firstName,
+            lastName = viewModel.lastName,
+            email = viewModel.email,
+            phone = viewModel.phone,
+            imagePath = viewModel.imagePath
          )
 
          AssignedWorkorders(
             navController = navController,
             personId = personId!!,
-            assignedWorkorders = peopleViewModel.workorders,
-            onRemoveWorkorder = { peopleViewModel.removeWorkorder(it) }
+            assignedWorkorders = viewModel.workorders,
+            onRemoveWorkorder = { viewModel.removeWorkorder(it) }
          )
-
-         var list: MutableList<Workorder> = remember { mutableListOf() }
-         if (uiStateListWorkorder is UiState.Success) {
-            (uiStateListWorkorder as UiState.Success<List<Workorder>>).data?.let { it: List<Workorder> ->
-               list = it.toMutableList()
-               logVerbose(tag, "uiStateListWorkorder.Success items.size ${list.size}")
-            }
-         }
          DefaultWorkordersList(
-            workorders = list,
-            onAddWorkorder = { peopleViewModel.addWorkorder(it)},
+            workorders = viewModel.workorders,
+            onAddWorkorder = { viewModel.addWorkorder(it)},
          )
-      } // Column
+      }
 
-      val coroutineScope = rememberCoroutineScope()
-      ObserveAsEvents(peopleViewModel.errorChannelFlow) { event: ErrorEvent ->
-         when (event) {
-            is ErrorEvent.ShowError -> {
-               coroutineScope.launch {
-                  snackbarHostState.showSnackbar(
-                     message = peopleViewModel.errorState.error ?: "unknow error",
-                     actionLabel = "ok",
-                     withDismissAction = false,
-                     duration = SnackbarDuration.Short
-                  )
-                  if (peopleViewModel.errorState.back) {
-                     logInfo(tag, "Back Navigation (Abort)")
-                     navController.popBackStack(
-                        route = NavScreen.PeopleList.route,
-                        inclusive = false
-                     )
-                  }
-                  // reset error state
-                  peopleViewModel.onErrorStateChange(ErrorState())
-               }
-            }
+      EventEffect(
+         event = errorState.errorEvent,
+         onHandled = viewModel::onErrorEventHandled
+      ){ errorMessage: String ->
+         snackbarHostState.showSnackbar(
+            message = errorMessage,
+            actionLabel = "ok",
+            withDismissAction = false,
+            duration = SnackbarDuration.Short
+         )
+         if (errorState.back) {
+            logInfo(tag, "Back Navigation (Abort)")
+            navController.popBackStack(
+               route = NavScreen.PeopleList.route,
+               inclusive = false
+            )
          }
       }
    }

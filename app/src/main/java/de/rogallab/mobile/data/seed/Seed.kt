@@ -55,14 +55,15 @@ class Seed @Inject constructor(
       val coroutineScope = CoroutineScope(Job() + _dispatcher + _exceptionHandler)
 
       val job = coroutineScope.launch {
-         val resource = _peopleRepository.count()
+         var result: ResultData<Int> = _peopleRepository.count()
          var countPeople = 0;
+         if(result is ResultData.Success) {  countPeople = result.data  }
 
-         if(resource is ResultData.Success) {
-            countPeople = resource.data!!
-         }
+         result = _workordersRepository.count()
+         var countWorkorders = 0;
+         if(result is ResultData.Success) {  countWorkorders = result.data  }
 
-         if(countPeople == 0 && _workordersRepository.count() == 0) {
+         if(countPeople == 0 && countWorkorders == 0) {
             _imagesUri = initializeImages()
             val people = initializePeople(_imagesUri)
             val workorders = initializeWorkorders()

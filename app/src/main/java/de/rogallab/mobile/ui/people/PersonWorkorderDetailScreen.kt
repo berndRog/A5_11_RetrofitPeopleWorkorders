@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
+import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.HandleUiStateError
 import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.PersonCard
@@ -54,6 +56,8 @@ fun PersonWorkorderDetailScreen(
 ) {        // 12345678901234567890123
    val tag = "ok>PersonWorkDetailScr."
 
+   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
+
    BackHandler(
       enabled = true,
       onBack = {
@@ -65,19 +69,16 @@ fun PersonWorkorderDetailScreen(
       }
    )
 
-   val uiStateWorkorder by viewModel.uiStateWorkorderFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStateWorkorder,"UiState Workorder", tag )
-
-   val snackbarHostState = remember { SnackbarHostState() }
-
    workorderId?.let {
       LaunchedEffect(viewModel.dbChanged) {
          logDebug(tag, "readByIdWithPerson()")
          viewModel.readByIdWithPerson(workorderId)
       }
    } ?: run {
-      viewModel.onUiStateWorkorderFlowChange(UiState.Error("No id for person is given"))
+      viewModel.triggerErrorEvent("No id for person is given", up = true, back = false)
    }
+
+   val snackbarHostState = remember { SnackbarHostState() }
 
    Scaffold(
       topBar = {
@@ -86,15 +87,13 @@ fun PersonWorkorderDetailScreen(
             navigationIcon = {
                IconButton(onClick = {
                   viewModel.update(workorderId!!)
-                  if(viewModel.uiStateWorkorderFlow.value.upHandler) {
-                     logInfo(tag, "Reverse Navigation (Up) viewModel.update()")
+                  if (errorState.up) {
                      navController.navigate(
                         route = NavScreen.PersonWorkorderOverview.route + "/${viewModel.assignedPerson!!.id}") {
                         popUpTo(route = NavScreen.PersonWorkorderDetail.route) { inclusive = true }
                      }
                   }
-                  if(viewModel.uiStateWorkorderFlow.value.backHandler) {
-                     logInfo(tag, "Back Navigation, Error in viewModel.add()")
+                  if(errorState.back) {
                      navController.popBackStack(
                         route = NavScreen.PersonWorkorderOverview.route + "/${viewModel.assignedPerson!!.id}",
                         inclusive = false
@@ -191,17 +190,23 @@ fun PersonWorkorderDetailScreen(
       }
    }
 
-   if (uiStateWorkorder is UiState.Error) {
-      HandleUiStateError(
-         uiStateFlow = uiStateWorkorder,
-         actionLabel = "Ok",
-         onErrorAction = { },
-         snackbarHostState = snackbarHostState,
-         navController = navController,
-         routePopBack = NavScreen.WorkordersList.route,
-         onUiStateFlowChange = { viewModel.onUiStateWorkorderFlowChange(it) },
-         tag = tag
+   EventEffect(
+      event = errorState.errorEvent,
+      onHandled = viewModel::onErrorEventHandled
+   ){ errorMessage: String ->
+      snackbarHostState.showSnackbar(
+         message = errorMessage,
+         actionLabel = "ok",
+         withDismissAction = false,
+         duration = SnackbarDuration.Short
       )
+      if (errorState.back) {
+         logInfo(tag, "Back Navigation (Abort)")
+         navController.popBackStack(
+            route = NavScreen.WorkordersList.route,
+            inclusive = false
+         )
+      }
    }
 }
 

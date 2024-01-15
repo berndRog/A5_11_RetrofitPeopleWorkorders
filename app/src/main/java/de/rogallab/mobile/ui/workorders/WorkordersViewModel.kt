@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.rogallab.mobile.domain.IWorkordersRepository
+import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
@@ -18,6 +19,7 @@ import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.ui.composables.handled
 import de.rogallab.mobile.ui.composables.trigger
 import de.rogallab.mobile.ui.people.ErrorState
+import de.rogallab.mobile.ui.people.PeopleViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -52,64 +54,72 @@ class WorkordersViewModel @Inject constructor(
 
    // Observables (DataBinding)
    private var _created: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val created: ZonedDateTime = _created
+   val created: ZonedDateTime
+      get() = _created
    fun onCreatedChange(value: ZonedDateTime) {
-      if(value != _created) _created = value
+      if (value != _created) _created = value
    }
 
    private var _title: String by mutableStateOf(value = "")
-   val title: String = _title
+   val title: String
+      get() = _title
    fun onTitleChange(value: String) {
-      if(value != _title) _title = value
+      if (value != _title) _title = value
    }
 
    private var _description: String by mutableStateOf(value = "")
    val description: String = _description
    fun onDescriptionChange(value: String) {
-      if(value != _description) _description = value
+      if (value != _description) _description = value
    }
 
    private var _started: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val started: ZonedDateTime = _started
+   val started: ZonedDateTime
+      get () = _started
    fun onStartedChange(value: ZonedDateTime) {
       _state = WorkState.Started
       _started = value
    }
 
    private var _completed: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val completed: ZonedDateTime = _completed
+   val completed: ZonedDateTime
+      get() = _completed
    fun onCompletedChange(value: ZonedDateTime) {
       _state = WorkState.Completed
       _completed = value
-      _duration = Duration.between( _started.toInstant() ,
-         _completed.toInstant() )
+      _duration = Duration.between(_started.toInstant(),
+         _completed.toInstant())
    }
 
    private var _state: WorkState by mutableStateOf(WorkState.Default)
-   val state = _state
+   val state: WorkState
+      get() = _state
 
    private var _duration: Duration = Duration.ZERO
 
    private var _remark: String by mutableStateOf(value = "")
-   val remark: String = _remark
+   val remark: String
+      get() = _remark
    fun onRemarkChange(value: String) {
-      if(value != _remark) _remark = value
+      if (value != _remark) _remark = value
    }
 
    private var _imagePath: String? by mutableStateOf(value = null)
-   val imagePath = _imagePath
+   val imagePath
+      get() = _imagePath
    fun onImagePathChange(value: String?) {
-      if(value != _imagePath )  _imagePath = value
+      if (value != _imagePath) _imagePath = value
    }
 
    private var _assignedPerson: Person? = null
-   val assignedPerson = _assignedPerson
+   val assignedPerson: Person?
+      get() = _assignedPerson
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
       exception.localizedMessage?.let {
          logError(tag, it)
-         _uiStateWorkordereFlow.value = UiState.Error(it, true)
+         triggerErrorEvent(message = it, up = true, back = false)
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -123,21 +133,9 @@ class WorkordersViewModel @Inject constructor(
 
    override fun onCleared() {
       // cancel all coroutines, when lifecycle of the viewmodel ends
-      logDebug(tag,"Cancel all child coroutines")
+      logDebug(tag, "Cancel all child coroutines")
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
-   }
-
-   // StateFlow for Input&Detail Screens
-   private var _uiStateWorkordereFlow: MutableStateFlow<UiState<Workorder>> =
-      MutableStateFlow(value = UiState.Empty)
-   val uiStateWorkorderFlow: StateFlow<UiState<Workorder>>
-      get() = _uiStateWorkordereFlow
-   fun onUiStateWorkorderFlowChange(uiState: UiState<Workorder>) {
-      _uiStateWorkordereFlow.value = uiState
-      if(uiState is UiState.Error) {
-         logError(tag,uiState.message)
-      }
    }
 
    // Error State
@@ -149,6 +147,7 @@ class WorkordersViewModel @Inject constructor(
          currentState.copy(errorEvent = trigger(message), up, back)
       }
    }
+
    fun onErrorEventHandled() {
       _stateFlowError.update { currentState ->
          currentState.copy(errorEvent = handled(), up = true, back = false)
@@ -157,140 +156,120 @@ class WorkordersViewModel @Inject constructor(
 
    val uiStateListWorkorderFlow: StateFlow<UiState<List<Workorder>>> =
       readAll()
-   .stateIn(
-      viewModelScope,
-      SharingStarted.Eagerly,
-      UiState.Empty
-   )
+         .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            UiState.Empty
+         )
 
    private fun readAll(): Flow<UiState.Success<List<Workorder>>> = flow {
-      _repository.readAll().collect{ workorders: List<Workorder> ->
-         logDebug(tag, "readAll() ${workorders.size}")
-         emit(UiState.Success(workorders))
-      }
-   }.flowOn(_dispatcher+_exceptionHandler)
-
-   fun readById(id: UUID)  {
-      logDebug(tag, "readById()")
-      try {
-         _coroutineScope.launch {
-            val workorder = _coroutineScope.async {
-               return@async _repository.findById(id)
-            }.await()
-            workorder?.let{ it:Workorder ->
-               setStateFromWorkorder(it)
-               logDebug(tag, "readById() ${workorder.asString()}")
-               _uiStateWorkordereFlow.value = UiState.Empty  // no return neeeded
-               dbChanged = false
-            } ?: run {
-               throw Exception("Person with given id not found")
-            }
-         }
-      }
-      catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag,message)
-         _uiStateWorkordereFlow.value =  UiState.Error(message)
-      }
-   }
-
-   fun readByIdWithPerson(id: UUID)  {
-      logDebug(tag, "readByIdWithPerson()")
-      try {
-         _coroutineScope.launch {
-            val map: Map<Workorder, Person?> = _coroutineScope.async {
-               return@async _repository.findByIdWithPerson(id)
-            }.await()
-            val workorder = map.keys.first()
-            setStateFromWorkorder(workorder)
-            _assignedPerson = map.values.firstOrNull()
-            logDebug(tag, "readById() ${workorder.asString()}")
-            _uiStateWorkordereFlow.value = UiState.Empty  // no return neeeded
-            dbChanged = false
-         }
-      }
-      catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag,message)
-         _uiStateWorkordereFlow.value =  UiState.Error(message)
-      }
-   }
-
-   fun add(w:Workorder? = null) {
-      try {
-         val workorder = w ?: getWorkorderFromState()
-         _coroutineScope.launch {
-            val result = _coroutineScope.async {
-               _repository.add(workorder)
-            }.await()
-            if (result) {
-               logVerbose(tag, "add() ${workorder.asString()}")
-               _uiStateWorkordereFlow.value = UiState.Empty
-               dbChanged = true
-            } else {
-               val message = "Error in add()"
-               logError(tag, message)
-               _uiStateWorkordereFlow.value = UiState.Error(message,false,true)
-            }
-         }
-      } catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag, message)
-         _uiStateWorkordereFlow.value = UiState.Error(message, false, true)
-      }
-   }
-
-   fun update(id:UUID) {
-      try {
-         val upWorkOrder = getWorkorderFromState(id)
-         _coroutineScope.launch {
-            val result = _coroutineScope.async {
-               _repository.update(upWorkOrder)
-            }.await()
-            if(result) {
-               logVerbose(tag, "update() ${upWorkOrder.asString()}")
-               _uiStateWorkordereFlow.value = UiState.Empty
-               dbChanged = true
-            } else {
-               val message = "Error in update()"
-               logError(tag, message)
-               _uiStateWorkordereFlow.value = UiState.Error(message, false, true)
-            }
-         }
-      } catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag,message)
-         _uiStateWorkordereFlow.value =  UiState.Error(message, false, true)
-      }
-   }
-
-   fun remove(id:UUID) {
-      try {
-         _coroutineScope.launch {
-            val workorderDto = _coroutineScope.async {
-               return@async _repository.findById(id)
-            }.await()
-            workorderDto?.let{
-               val result = _coroutineScope.async {
-                  _repository.remove(workorderDto)
-               }.await()
-               if(result) {
-                  logVerbose(tag, "removed() ${workorderDto.asString()}")
-                  _uiStateWorkordereFlow.value = UiState.Success(null)
-                  dbChanged = true
-               } else {
-                  val message = "Error in remove()"
-                  logError(tag, message)
-                  _uiStateWorkordereFlow.value = UiState.Error(message, false, true)
+      _repository.selectAll().collect { result ->
+         when (result) {
+            is ResultData.Success -> {
+               result.data?.let { it: List<Workorder> ->
+                  emit(UiState.Success(it))
                }
-            } ?: run {
-               throw Exception("remove(): Workorder with given id not found")
+            }
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+
+            else -> Unit
+         }
+      }
+   }.flowOn(_dispatcher)
+
+   fun readById(id: UUID) {
+      _coroutineScope.launch {
+         when (val result = _repository.findById(id)) {
+            is ResultData.Success -> {
+               result.data?.let { it: Workorder ->
+                  setStateFromWorkorder(it)
+                  dbChanged = false
+               }
+            }
+
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+
+            else -> Unit
+         }
+      }
+   }
+
+   fun readByIdWithPerson(id: UUID) {
+      _coroutineScope.launch {
+         when (val result: ResultData<Map<Workorder, Person?>> =
+            _repository.findByIdWithPerson(id)) {
+            is ResultData.Success -> {
+               val map: Map<Workorder, Person?> = result.data
+               val workorder: Workorder = map.keys.first()
+               setStateFromWorkorder(workorder)
+               _assignedPerson = map.values.firstOrNull()
+               logDebug(tag, "readById() ${workorder.asString()}")
+               dbChanged = false
+            }
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+            else -> Unit
+         }
+      }
+   }
+
+   fun add(w: Workorder? = null) {
+      val workorder = w ?: getWorkorderFromState()
+      _coroutineScope.launch {
+         when (val result = _repository.add(workorder)) {
+            is ResultData.Loading -> Unit
+            is ResultData.Success -> dbChanged = true
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
             }
          }
-      } catch (e: Exception) {
-         val message = e.localizedMessage ?: e.stackTraceToString()
-         logError(tag,message)
-         _uiStateWorkordereFlow.value =  UiState.Error(message, false, true)
+      }
+   }
+
+   fun update(id: UUID) {
+      val upWorkOrder = getWorkorderFromState(id)
+      _coroutineScope.launch {
+         when (val result = _repository.update(upWorkOrder)) {
+            is ResultData.Loading -> Unit
+            is ResultData.Success ->  dbChanged = true
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+         }
+      }
+   }
+
+   fun remove(id: UUID) {
+      val workorder = getWorkorderFromState(id)
+      _coroutineScope.launch {
+         when (val result = _repository.remove(workorder)) {
+            is ResultData.Success -> {
+               dbChanged = true
+            }
+
+            is ResultData.Failure -> {
+               val message = result.errorMessageOrNull() ?: "unknown error"
+               logError(tag, message)
+               triggerErrorEvent(message = message, up = false, back = true)
+            }
+
+            else -> Unit
+         }
       }
    }
 
@@ -299,18 +278,16 @@ class WorkordersViewModel @Inject constructor(
       // toDo
    }
 
-   fun clearState() {
-      _created = zonedDateTimeNow()
-      _title =  ""
-      _description = ""
-      _started =  _created
-      _completed = _created
-      _state = WorkState.Default
-      _remark = ""
-      _imagePath = null
-      _id = UUID.randomUUID()
-      _assignedPerson = null
-   }
+   fun getWorkorderFromState(
+      id: UUID? = null
+   ): Workorder =
+      id?.let {
+         return@let Workorder(_title, _description, _created, _started, _completed,
+            _duration, _remark, _imagePath, _state, id, _assignedPerson, _assignedPerson?.id)
+      } ?: run {
+         return@run Workorder(_title, _description, _created, _started, _completed,
+            _duration, _remark, _imagePath, _state, _id, _assignedPerson, _assignedPerson?.id)
+      }
 
    private fun setStateFromWorkorder(
       workOrder: Workorder
@@ -328,19 +305,24 @@ class WorkordersViewModel @Inject constructor(
       _assignedPerson = workOrder.person
    }
 
-   fun getWorkorderFromState(
-      id:UUID? = null
-   ): Workorder =
-      id?.let {
-         return@let Workorder(_title, _description, _created, _started, _completed,
-            _duration, _remark, _imagePath, _state, id, _assignedPerson, _assignedPerson?.id)
-      } ?: run {
-         return@run Workorder(_title, _description, _created, _started, _completed,
-            _duration, _remark, _imagePath, _state, _id, _assignedPerson, _assignedPerson?.id)
-      }
+   fun clearState() {
+      _created = zonedDateTimeNow()
+      _title = ""
+      _description = ""
+      _started = _created
+      _completed = _created
+      _state = WorkState.Default
+      _remark = ""
+      _imagePath = null
+      _id = UUID.randomUUID()
+      _assignedPerson = null
+   }
+
+
+
 
    companion object {
-                             //12345678901234567890123
+      //12345678901234567890123
       private const val tag = "ok>WorkordersViewModel."
    }
 }

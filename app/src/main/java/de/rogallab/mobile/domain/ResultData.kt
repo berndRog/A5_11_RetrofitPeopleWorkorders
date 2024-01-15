@@ -69,5 +69,5 @@ sealed class ResultData<out T>(
       }
    }
 
-   data object Empty                                   : ResultData<Nothing>(null)   // Singleton
+   //data object Empty                                   : ResultData<Nothing>(null)   // Singleton
 }
