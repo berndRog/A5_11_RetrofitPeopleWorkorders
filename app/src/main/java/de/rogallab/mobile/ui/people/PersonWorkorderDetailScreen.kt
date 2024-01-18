@@ -31,15 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 import de.rogallab.mobile.ui.composables.EventEffect
-import de.rogallab.mobile.ui.composables.HandleUiStateError
-import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.people.composables.InputCompleted
@@ -86,7 +83,7 @@ fun PersonWorkorderDetailScreen(
             title = { Text(stringResource(R.string.personwork_detail)) },
             navigationIcon = {
                IconButton(onClick = {
-                  viewModel.update(workorderId!!)
+                  viewModel.update()
                   if (errorState.up) {
                      navController.navigate(
                         route = NavScreen.PersonWorkorderOverview.route + "/${viewModel.assignedPerson!!.id}") {

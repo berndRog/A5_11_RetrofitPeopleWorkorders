@@ -13,13 +13,10 @@ object ZonedDateTimeConverters {
    fun stringToZonedDateTime(utcTimeStamp: String): ZonedDateTime =
       ZonedDateTime.parse(utcTimeStamp, formatISO)
          .withZoneSameInstant(systemZoneId)
-
    @TypeConverter
    fun zonedDateTimeToString(zdt: ZonedDateTime): String =
       toZonedDateTimeUTC(zdt).format(formatISO)
-
 }
-
 
 @ProvidedTypeConverter
 object UUIDConverter {

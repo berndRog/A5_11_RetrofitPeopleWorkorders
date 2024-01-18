@@ -29,6 +29,12 @@ android {
       vectorDrawables {
          useSupportLibrary = true
       }
+
+      packaging {
+         resources {
+            excludes += "META-INF/LICENSE.md"
+         }
+      }
    }
 
    buildTypes {
@@ -60,13 +66,13 @@ android {
    packaging {
       resources {
          excludes += "/META-INF/{AL2.0,LGPL2.1}"
+         pickFirsts += "/META-INF/LICENSE-notice.md"
       }
    }
 }
 
 dependencies {
 
-   testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
    // https://developer.android.com/jetpack/androidx/releases/activity
    val activityCompose = "1.8.2"
    implementation("androidx.activity:activity-compose:$activityCompose")
@@ -117,7 +123,7 @@ dependencies {
 
    // Room Database
    // https://developer.android.com/jetpack/androidx/releases/room
-   val roomVersion = "2.6.1"
+   val roomVersion = "2.6.0"
    implementation("androidx.room:room-runtime:$roomVersion")
    implementation("androidx.room:room-ktx:$roomVersion")
 // kapt("androidx.room:room-compiler:$roomVersion")
@@ -160,8 +166,8 @@ dependencies {
 
    // TESTS -----------------------
    testImplementation("junit:junit:4.13.2")
+   //testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-
    // ANDROID TESTS ---------------
    // https://developer.android.com/jetpack/androidx/releases/test
    val androidTestCore = "1.5.0"

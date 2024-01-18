@@ -33,8 +33,8 @@ fun <T> EventEffect(
 @NonRestartableComposable
 fun <T> NavigationEventEffect(
    event: BaseEvent<T>,         // event to observe
-   action: suspend (T) -> Unit, // action to perform when event is triggered
    onHandled: ()  -> Unit,      // action to perform when event is handled
+   action: suspend (T) -> Unit, // action to perform when event is triggered
 ) {
    LaunchedEffect(key1 = event) {
       if (event is TriggerBaseEvent<T>) {

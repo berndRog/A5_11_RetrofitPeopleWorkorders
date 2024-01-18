@@ -1,8 +1,11 @@
 package de.rogallab.mobile.data.repositories
 
 import de.rogallab.mobile.data.IWorkordersDao
+import de.rogallab.mobile.data.IWorkordersWebservice
+import de.rogallab.mobile.data.ImagesWebservice
 import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.data.models.WorkorderDto
+import de.rogallab.mobile.data.network.httpStatusMessage
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
@@ -14,13 +17,18 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import retrofit2.Response
+import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
 
 class WordordersRepositoryImpl @Inject constructor(
-   private val _workordersDao: IWorkordersDao,
+   private val _dao: IWorkordersDao,
+   private val _webservice: IWorkordersWebservice,
    private val _dispatcher: CoroutineDispatcher,
    private val _exceptionHandler: CoroutineExceptionHandler
 ) : IWorkordersRepository {
@@ -28,9 +36,10 @@ class WordordersRepositoryImpl @Inject constructor(
             //12345678901234567890123
    val tag = "ok>WorkorderReposImpl ."
 
+   // L O C A L   D A T A B A S E
    override fun selectAll(): Flow<ResultData<List<Workorder>>>  = flow {
       try {
-         val flowWordorderDtos: Flow<MutableList<WorkorderDto>> = _workordersDao.selectAll()
+         val flowWordorderDtos: Flow<MutableList<WorkorderDto>> = _dao.selectAll()
          flowWordorderDtos.collect{ workorderDtos: MutableList<WorkorderDto> ->
             val workorders: List<Workorder> =
                workorderDtos.map { workorderDto: WorkorderDto -> toWorkorder(workorderDto) }
@@ -46,7 +55,7 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             //throw Exception("Test Error thrown in findById()")
-            _workordersDao.selectById(id)?.let { dto: WorkorderDto ->
+            _dao.selectById(id)?.let { dto: WorkorderDto ->
                val workorder: Workorder = toWorkorder(dto)
                logDebug(tag, "findById() success")
                return@withContext ResultData.Success(workorder)
@@ -62,7 +71,7 @@ class WordordersRepositoryImpl @Inject constructor(
    override suspend fun count(): ResultData<Int> =
       withContext(_dispatcher) {
          try {
-            val records = _workordersDao.count()
+            val records = _dao.count()
             logDebug(tag, "count() $records")
 //       throw Exception("Error thrown in count()")
             return@withContext ResultData.Success(records)
@@ -75,9 +84,9 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             // throw Exception("Error thrown in add()")
-            val workorderDto = workorder.toWorkorderDto()
             logDebug(tag, "insert() ${workorder.asString()}")
-            _workordersDao.insert(workorderDto)
+            val dto = toWorkorderDto(workorder)
+            _dao.insert(dto)
             return@withContext ResultData.Success(Unit)
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -88,9 +97,9 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             // throw Exception("Error thrown in addAll()")
-            val workorderDtos = workorders.map { it.toWorkorderDto() }
             logDebug(tag, "addAll()")
-            _workordersDao.insertAll(workorderDtos)
+            val dtos: List<WorkorderDto> = workorders.map { toWorkorderDto(it) }
+            _dao.insertAll(dtos)
             return@withContext ResultData.Success(Unit)
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -101,9 +110,9 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             // throw Exception("Error thrown in update()")
-            val workorderDto = workorder.toWorkorderDto()
             logDebug(tag, "update()")
-            _workordersDao.update(workorderDto)
+            val dto = toWorkorderDto(workorder)
+            _dao.update(dto)
             return@withContext ResultData.Success(Unit)
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -114,9 +123,9 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             // throw Exception("Error thrown in remove()")
-            val workorderDto = workorder.toWorkorderDto()
+            val dto = toWorkorderDto(workorder)
             logDebug(tag, "remove()")
-            _workordersDao.delete(workorderDto)
+            _dao.delete(dto)
             return@withContext ResultData.Success(Unit)
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -128,7 +137,7 @@ class WordordersRepositoryImpl @Inject constructor(
          try {
             // selectByIdWithPerson() returns a Map of DTOs
             logDebug(tag, ",loadWorkorderWithPerson()")
-            val mapDtos: Map<WorkorderDto, PersonDto?> = _workordersDao.findByIdWithPerson(id)
+            val mapDtos: Map<WorkorderDto, PersonDto?> = _dao.findByIdWithPerson(id)
             // Transform the DTOs to domain entities
             val map: Map<Workorder, Person?> = mapDtos
                .mapKeys { entry -> toWorkorder(entry.key) }
@@ -138,4 +147,72 @@ class WordordersRepositoryImpl @Inject constructor(
             return@withContext ResultData.Failure(t)
          }
       }
+
+   // W E B S E R V I C E
+   override fun getAll(): Flow<ResultData<List<Workorder>>> = flow {
+      try {
+         val response: Response<List<WorkorderDto>> = _webservice.getAll()
+         logResponse(tag, response)
+
+         if (response.isSuccessful) {
+            response.body()?.let { workordersDto: List<WorkorderDto> ->
+               val workorders: List<Workorder> = workordersDto.map { workorderDto -> toWorkorder(workorderDto) }
+               emit(ResultData.Success(workorders))
+            } ?: run {
+               emit(ResultData.Failure(
+                  IOException("response is successful, but body() is null"), tag))
+            }
+         } else {
+            emit(ResultData.Failure(
+               IOException("response is not successful ${httpStatusMessage(response.code())}"), tag))
+         }
+      }  catch(t: Throwable) {
+         emit(ResultData.Failure(t, tag))
+      }
+   }  .catch { t: Throwable ->
+      emit(ResultData.Failure(t, tag))
+   }  .flowOn(_dispatcher + _exceptionHandler)
+
+   override suspend fun getById(id: UUID): ResultData<Workorder> =
+      withContext(_dispatcher) {
+         try {
+            val response = _webservice.getById(id)
+            logResponse(tag, response)
+
+            if (response.isSuccessful) {
+               response.body()?.let { workorderDto ->
+                  val workorder: Workorder = toWorkorder(workorderDto)
+                  return@withContext ResultData.Success(workorder)
+               } ?: run {
+                  return@withContext ResultData.Failure(
+                     IOException("response is successful, but body() is null"), tag)
+               }
+            } else {
+               return@withContext ResultData.Failure(IOException("response is not successful" +
+                  " ${httpStatusMessage(response.code())}"), tag)
+            }
+         } catch(t: Throwable) {
+            return@withContext ResultData.Failure(t, tag)
+         }
+      }
+
+   override suspend fun post(workorder: Workorder): ResultData<Unit> =
+      withContext(_dispatcher) {
+         try {
+            val workorderDto = toWorkorderDto(workorder)
+            val response = _webservice.post(workorderDto)
+            // logResponse(tag, response)
+            if (response.isSuccessful) {
+               return@withContext ResultData.Success(Unit)
+            } else {
+               return@withContext ResultData.Failure(IOException("response is not successful " +
+                  "${httpStatusMessage(response.code())}"), tag)
+            }
+         }
+         catch (t: Throwable) {
+            return@withContext ResultData.Failure(t, tag)
+         }
+      }
+
+
 }

@@ -12,13 +12,15 @@ import de.rogallab.mobile.AppStart
 import de.rogallab.mobile.data.IPeopleDao
 import de.rogallab.mobile.data.IPeopleWebservice
 import de.rogallab.mobile.data.IWorkordersDao
+import de.rogallab.mobile.data.IWorkordersWebservice
+import de.rogallab.mobile.data.ImagesWebservice
 import de.rogallab.mobile.data.database.AppDatabase
 import de.rogallab.mobile.data.network.ApiKey
 import de.rogallab.mobile.data.network.BearerToken
 import de.rogallab.mobile.data.network.NetworkConnection
 import de.rogallab.mobile.data.network.NetworkConnectivity
 import de.rogallab.mobile.data.network.WebserviceBuilder
-import de.rogallab.mobile.data.seed.Seed
+import de.rogallab.mobile.data.seed.SeedDatabase
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.utilities.logError
@@ -30,92 +32,9 @@ import kotlinx.coroutines.Dispatchers
 @Module
 //@InstallIn(SingletonComponent::class)
 @InstallIn(ViewModelComponent::class)
-object ProvideModules {
+object ProvideNetworkModules {
                           //12345678901234567890123
-   private const val tag = "ok>AppProvidesModules ."
-
-   @Provides
-   @ViewModelScoped
-   fun provideContext(
-      application: Application // provided by Hilt
-   ): Context {
-      logInfo(tag, "providesContext()")
-      return application.applicationContext
-   }
-
-   @Provides
-   @ViewModelScoped
-   fun provideCoroutineExceptionHandler(
-   ): CoroutineExceptionHandler {
-      logInfo(tag, "providesCoroutineExceptionHandler()")
-      return CoroutineExceptionHandler { _, exception ->
-         exception.localizedMessage?.let {
-            logError("ok>CoroutineException", it)
-         } ?: run {
-            exception.stackTrace.forEach {
-               logError("ok>CoroutineException", it.toString())
-            }
-         }
-      }
-   }
-   @Provides
-   @ViewModelScoped
-   fun provideCoroutineDispatcher(
-   ): CoroutineDispatcher {
-      logInfo(tag, "providesCoroutineDispatcher()")
-      return Dispatchers.IO
-   }
-
-   @Provides
-   @ViewModelScoped
-   fun provideSeed(
-      application: Application,
-      peopleRepository: IPeopleRepository,
-      workordersRepository: IWorkordersRepository,
-      dispatcher: CoroutineDispatcher,
-      exceptionHandler: CoroutineExceptionHandler
-   ): Seed {
-      logInfo(tag, "providesSeed()")
-      return Seed(
-         application,
-         peopleRepository,
-         workordersRepository,
-         dispatcher,
-         exceptionHandler
-      )
-   }
-
-   @Provides
-   @ViewModelScoped
-   fun providePeopleDao(
-      database: AppDatabase
-   ): IPeopleDao {
-      logInfo(tag, "providesIPeopleDao()")
-      return database.createPeopleDao()
-   }
-
-   @Provides
-   @ViewModelScoped
-   fun provideWorkOrdersDao(
-      database: AppDatabase
-   ): IWorkordersDao {
-      logInfo(tag, "providesIWorkordersDao()")
-      return database.createWordordersDao()
-   }
-
-   @Provides
-   @ViewModelScoped
-   fun provideAppDatabase(
-      application: Application // provided by Hilt
-   ): AppDatabase {
-      logInfo(tag, "providesAppDatabase()")
-      return Room.databaseBuilder(
-         application.applicationContext,
-         AppDatabase::class.java,
-         AppStart.database_name
-      ).fallbackToDestructiveMigration()
-         .build()
-   }
+   private const val tag = "ok>ProvideNetworkModul."
 
    @Provides
    @ViewModelScoped
@@ -158,13 +77,47 @@ object ProvideModules {
       apiKey: ApiKey,
       bearerToken: BearerToken
    ): IPeopleWebservice {
-      logInfo(tag,"provideNewsWebservice()")
+      logInfo(tag,"providePeopleWebservice()")
       WebserviceBuilder(
          networkConnectivity,
          apiKey,
          bearerToken
       ).apply{
          return create(IPeopleWebservice::class.java, "PeopleWebservice")
+      }
+   }
+
+   @Provides
+   @ViewModelScoped
+   fun provideWorkordersWebservice(
+      networkConnectivity: NetworkConnectivity,
+      apiKey: ApiKey,
+      bearerToken: BearerToken
+   ): IWorkordersWebservice {
+      logInfo(tag,"provideWorkordersWebservice()")
+      WebserviceBuilder(
+         networkConnectivity,
+         apiKey,
+         bearerToken
+      ).apply{
+         return create(IWorkordersWebservice::class.java, "WorkordersWebservice")
+      }
+   }
+
+   @Provides
+   @ViewModelScoped
+   fun provideImagesWebservice(
+      networkConnectivity: NetworkConnectivity,
+      apiKey: ApiKey,
+      bearerToken: BearerToken
+   ): ImagesWebservice {
+      logInfo(tag,"provideImagesWebservice()")
+      WebserviceBuilder(
+         networkConnectivity,
+         apiKey,
+         bearerToken
+      ).apply{
+         return create(ImagesWebservice::class.java, "ImagesWebservice")
       }
    }
 }

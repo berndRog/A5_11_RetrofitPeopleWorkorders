@@ -43,7 +43,7 @@ class ResultDataTest {
       assertTrue(result.isFailure)
       val actual = result.failureOrNull()
       assertEquals(exception, actual)
-      val message = result.errorMessageOrNull();
+      val message = result.errorMessageOrNull()
       assertEquals("IO Exception: "+errorMessage, message)
    }
 

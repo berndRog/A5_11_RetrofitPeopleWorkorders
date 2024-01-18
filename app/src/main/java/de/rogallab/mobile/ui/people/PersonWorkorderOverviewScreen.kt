@@ -2,14 +2,18 @@ package de.rogallab.mobile.ui.people
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DismissDirection
 import androidx.compose.material3.DismissValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,7 +32,10 @@ import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -37,6 +44,7 @@ import androidx.navigation.NavController
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.entities.Workorder
+import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
@@ -46,18 +54,32 @@ import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
+import de.rogallab.mobile.ui.workorders.WorkorderUiState
+import de.rogallab.mobile.ui.workorders.WorkordersViewModel
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonWorkorderOverviewScreen(
-   personId: UUID?,
+   id: UUID?,
    navController: NavController,
-   viewModel: PeopleViewModel
+   peopleViewModel: PeopleViewModel,
+   workordersViewModel: WorkordersViewModel
 ) {         //1234567890123456780123
    val tag = "ok>PersonWorkOverview."
 
-   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
+   if(id == null) {
+      peopleViewModel.triggerErrorEvent(message ="No id for person is given", up = false, back = true)
+   }
+   val personId: UUID by rememberSaveable { mutableStateOf(id!!)  }
+
+   LaunchedEffect(Unit) {
+      logDebug(tag, "ReadById(${personId.as8()})")
+      peopleViewModel.readByIdWithWorkorders(personId)
+   }
+
+   val workorderState: WorkorderUiState by workordersViewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
+   val errorState: ErrorState by peopleViewModel.stateFlowError.collectAsStateWithLifecycle()
 
    BackHandler(
       enabled = true,
@@ -70,19 +92,7 @@ fun PersonWorkorderOverviewScreen(
       }
    )
 
-   personId?.let {
-      LaunchedEffect(viewModel.dbChanged) {
-         logDebug(tag, "readByIdWithWorkorders()")
-         viewModel.readByIdWithWorkorders(personId)
-         //workordersViewModel.readAll()
-      }
-   } ?: run {
-      viewModel.triggerErrorEvent(
-         message ="No id for person is given", up = false, back = true)
-   }
-
    val snackbarHostState = remember { SnackbarHostState() }
-
    Scaffold(
       topBar = {
          TopAppBar(
@@ -121,36 +131,73 @@ fun PersonWorkorderOverviewScreen(
       }
    ) { innerPadding ->
 
-      Column(
-         modifier = Modifier
-            .padding(top = innerPadding.calculateTopPadding(),
-               bottom = innerPadding.calculateBottomPadding())
-            .padding(horizontal = 8.dp)
-            .fillMaxWidth()
-      ) {
-         PersonCard(
-            firstName = viewModel.firstName,
-            lastName = viewModel.lastName,
-            email = viewModel.email,
-            phone = viewModel.phone,
-            imagePath = viewModel.imagePath
-         )
+      if (workorderState.isLoading) {
+         logDebug(tag, "workorderState Loading")
+         Column(
+            modifier = Modifier
+               .padding(bottom = innerPadding.calculateBottomPadding())
+               .padding(horizontal = 8.dp)
+               .fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+         ) {
+            CircularProgressIndicator(modifier = Modifier.size(160.dp))
+         }
+      } else if (workorderState.isSuccessful && workorderState.workorders.isNotEmpty()) {
 
-         AssignedWorkorders(
-            navController = navController,
-            personId = personId!!,
-            assignedWorkorders = viewModel.workorders,
-            onRemoveWorkorder = { viewModel.removeWorkorder(it) }
-         )
-         DefaultWorkordersList(
-            workorders = viewModel.workorders,
-            onAddWorkorder = { viewModel.addWorkorder(it)},
-         )
+         val defaultWorkorders = workorderState.workorders
+            .filter { it: Workorder -> it.state == WorkState.Default }
+            .sortedBy { it.created }
+
+         val assignedWorkorders = workorderState.workorders
+            .filter { it: Workorder -> it.personId == personId }
+
+
+         Column(
+            modifier = Modifier
+               .padding(top = innerPadding.calculateTopPadding(),
+                  bottom = innerPadding.calculateBottomPadding())
+               .padding(horizontal = 8.dp)
+               .fillMaxWidth()
+         ) {
+            PersonCard(
+               firstName = peopleViewModel.firstName,
+               lastName = peopleViewModel.lastName,
+               email = peopleViewModel.email,
+               phone = peopleViewModel.phone,
+               imagePath = peopleViewModel.imagePath
+            )
+
+            if(assignedWorkorders.size == 0) {
+               Text(
+                  modifier = Modifier.padding(top = 16.dp),
+                  text = "Keine Arbeitsaufgaben zugewiesen",
+                  style = MaterialTheme.typography.titleMedium,
+               )
+            }
+            AssignedWorkorders(
+               navController = navController,
+               personId = personId,
+               assignedWorkorders = assignedWorkorders.toMutableList(),
+               onUnAssignWorkorder = { workorder: Workorder ->
+                  peopleViewModel.unassign(workorder)
+                  workordersViewModel.update(workorder)
+               }
+            )
+
+            DefaultWorkordersList(
+               workorders = defaultWorkorders.toMutableList(),
+               onAssignWorkorder = { workorder: Workorder ->
+                  peopleViewModel.assign(workorder)
+                  workordersViewModel.update(workorder)
+               },
+            )
+         }
       }
 
       EventEffect(
          event = errorState.errorEvent,
-         onHandled = viewModel::onErrorEventHandled
+         onHandled = peopleViewModel::onErrorEventHandled
       ){ errorMessage: String ->
          snackbarHostState.showSnackbar(
             message = errorMessage,
@@ -172,7 +219,7 @@ fun PersonWorkorderOverviewScreen(
 @Composable
 private fun DefaultWorkordersList(
    workorders: List<Workorder>,
-   onAddWorkorder: (Workorder) -> Unit
+   onAssignWorkorder: (Workorder) -> Unit
 ) {
 
    workorders.filter {
@@ -193,7 +240,8 @@ private fun DefaultWorkordersList(
             val (state, time) = evalWorkorderStateAndTime(workorder)
 
             Column(Modifier.clickable {
-               onAddWorkorder(workorder)
+               // assign the workorder to the person
+               onAssignWorkorder(workorder)
             }) {
                WorkorderCard(
                   time = time,
@@ -213,7 +261,7 @@ private fun AssignedWorkorders(
    navController: NavController,
    personId: UUID,
    assignedWorkorders: MutableList<Workorder>,
-   onRemoveWorkorder: (Workorder) -> Unit
+   onUnAssignWorkorder: (Workorder) -> Unit
 ) {
            //12345678901234567890123
    val tag ="ok>AssignedWorkorders ."
@@ -241,7 +289,10 @@ private fun AssignedWorkorders(
                      logDebug("ok>SwipeToDismiss", "-> Delete")
                      if(workorder.state != WorkState.Started &&
                         workorder.state != WorkState.Completed)   {
-                        onRemoveWorkorder(workorder)
+                        // unassign the workorder from the person
+                        // set the workorder to default
+                        // update the workorder in the database
+                        onUnAssignWorkorder(workorder)
                         navController.navigate(NavScreen.PersonWorkorderOverview.route + "/$personId")
                         return@rememberDismissState true
                      }                  }

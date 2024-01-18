@@ -8,23 +8,19 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.ResultData
-import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
-import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.ui.composables.handled
 import de.rogallab.mobile.ui.composables.trigger
 import de.rogallab.mobile.ui.people.ErrorState
-import de.rogallab.mobile.ui.people.PeopleViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.Flow
@@ -32,8 +28,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -51,6 +50,11 @@ class WorkordersViewModel @Inject constructor(
    var dbChanged: Boolean = false
 
    private var _id: UUID = UUID.randomUUID()
+   val id
+      get() = _id
+   fun onIdChange(value: UUID) {
+      if (value != _id) _id = value
+   }
 
    // Observables (DataBinding)
    private var _created: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
@@ -68,7 +72,8 @@ class WorkordersViewModel @Inject constructor(
    }
 
    private var _description: String by mutableStateOf(value = "")
-   val description: String = _description
+   val description: String
+      get() = _description
    fun onDescriptionChange(value: String) {
       if (value != _description) _description = value
    }
@@ -141,45 +146,61 @@ class WorkordersViewModel @Inject constructor(
    // Error State
    private var _stateFlowError: MutableStateFlow<ErrorState> = MutableStateFlow(ErrorState())
    val stateFlowError: StateFlow<ErrorState> = _stateFlowError.asStateFlow()
-
    fun triggerErrorEvent(message: String, up: Boolean, back: Boolean) {
       _stateFlowError.update { currentState ->
          currentState.copy(errorEvent = trigger(message), up, back)
       }
    }
-
    fun onErrorEventHandled() {
       _stateFlowError.update { currentState ->
          currentState.copy(errorEvent = handled(), up = true, back = false)
       }
    }
 
-   val uiStateListWorkorderFlow: StateFlow<UiState<List<Workorder>>> =
-      readAll()
-         .stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            UiState.Empty
-         )
+   fun onErrorAction() {
+      logDebug(tag, "onErrorAction()")
+      // toDo
+   }
 
-   private fun readAll(): Flow<UiState.Success<List<Workorder>>> = flow {
-      _repository.selectAll().collect { result ->
-         when (result) {
-            is ResultData.Success -> {
-               result.data?.let { it: List<Workorder> ->
-                  emit(UiState.Success(it))
-               }
-            }
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
+   // StateFlow for List Screens
+   private var _stateWorkorders: WorkorderUiState by mutableStateOf(WorkorderUiState())
+   val stateFlowWorkorders: StateFlow<WorkorderUiState> = fetchWorkorder()
+      .onEach { result: ResultData<List<Workorder>> -> updateState(result) }
+      .map { _stateWorkorders }
+      .stateIn(
+         viewModelScope,
+         SharingStarted.WhileSubscribed(1_000),
+         WorkorderUiState()
+      )
 
-            else -> Unit
-         }
+   private fun fetchWorkorder(): Flow<ResultData<List<Workorder>>> = flow {
+      emit(ResultData.Loading(true))
+      _repository.selectAll().collect { workorder: ResultData<List<Workorder>> ->
+         emit(workorder)
       }
-   }.flowOn(_dispatcher)
+   }  .catch {
+      emit(ResultData.Failure(it))
+   }  .flowOn(_dispatcher)
+
+   private fun updateState(result: ResultData<List<Workorder>>) {
+      when (result) {
+         is ResultData.Loading -> _stateWorkorders = _stateWorkorders.loading()
+         is ResultData.Success -> {
+            _stateWorkorders = _stateWorkorders.success(workorders = result.data)
+         }
+         is ResultData.Failure -> handleFailure(result, false, false)
+      }
+   }
+
+   private fun handleFailure(
+      result: ResultData<Any>,
+      up: Boolean = false,
+      back: Boolean = true    // default: back navigation
+   ) {
+      val message = result.errorMessageOrNull() ?: "Unknown error"
+      logError(tag, message)
+      triggerErrorEvent(message = message, up = up, back = back)
+   }
 
    fun readById(id: UUID) {
       _coroutineScope.launch {
@@ -190,13 +211,40 @@ class WorkordersViewModel @Inject constructor(
                   dbChanged = false
                }
             }
+            is ResultData.Failure -> handleFailure(result)
+            else -> Unit
+         }
+      }
+   }
 
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
+   fun add(w: Workorder? = null) {
+      val workorder = w ?: getWorkorderFromState()
+      _coroutineScope.launch {
+         when (val result = _repository.add(workorder)) {
+            is ResultData.Loading -> Unit
+            is ResultData.Success -> dbChanged = true
+            is ResultData.Failure -> handleFailure(result)
+         }
+      }
+   }
 
+   fun update(w: Workorder? = null) {
+      val workOrder = w ?: getWorkorderFromState()
+      _coroutineScope.launch {
+         when (val result = _repository.update(workOrder)) {
+            is ResultData.Loading -> Unit
+            is ResultData.Success ->  dbChanged = true
+            is ResultData.Failure -> handleFailure(result)
+         }
+      }
+   }
+
+   fun remove(id: UUID) {
+      val workorder = getWorkorderFromState(id)
+      _coroutineScope.launch {
+         when (val result = _repository.remove(workorder)) {
+            is ResultData.Success -> dbChanged = true
+            is ResultData.Failure -> handleFailure(result)
             else -> Unit
          }
       }
@@ -214,68 +262,10 @@ class WorkordersViewModel @Inject constructor(
                logDebug(tag, "readById() ${workorder.asString()}")
                dbChanged = false
             }
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
+            is ResultData.Failure -> handleFailure(result)
             else -> Unit
          }
       }
-   }
-
-   fun add(w: Workorder? = null) {
-      val workorder = w ?: getWorkorderFromState()
-      _coroutineScope.launch {
-         when (val result = _repository.add(workorder)) {
-            is ResultData.Loading -> Unit
-            is ResultData.Success -> dbChanged = true
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
-         }
-      }
-   }
-
-   fun update(id: UUID) {
-      val upWorkOrder = getWorkorderFromState(id)
-      _coroutineScope.launch {
-         when (val result = _repository.update(upWorkOrder)) {
-            is ResultData.Loading -> Unit
-            is ResultData.Success ->  dbChanged = true
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
-         }
-      }
-   }
-
-   fun remove(id: UUID) {
-      val workorder = getWorkorderFromState(id)
-      _coroutineScope.launch {
-         when (val result = _repository.remove(workorder)) {
-            is ResultData.Success -> {
-               dbChanged = true
-            }
-
-            is ResultData.Failure -> {
-               val message = result.errorMessageOrNull() ?: "unknown error"
-               logError(tag, message)
-               triggerErrorEvent(message = message, up = false, back = true)
-            }
-
-            else -> Unit
-         }
-      }
-   }
-
-   fun onErrorAction() {
-      logDebug(tag, "onErrorAction()")
-      // toDo
    }
 
    fun getWorkorderFromState(
@@ -317,9 +307,6 @@ class WorkordersViewModel @Inject constructor(
       _id = UUID.randomUUID()
       _assignedPerson = null
    }
-
-
-
 
    companion object {
       //12345678901234567890123

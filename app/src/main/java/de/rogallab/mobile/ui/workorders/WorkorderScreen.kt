@@ -39,6 +39,7 @@ import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
+import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.PersonCard
@@ -67,6 +68,7 @@ fun WorkorderScreen(
          LaunchedEffect(Unit) {
             logDebug(tag, "ReadById()")
             viewModel.readById(id)
+            viewModel.onIdChange(id)
          }
       } ?: run {
          viewModel.triggerErrorEvent(
@@ -92,7 +94,7 @@ fun WorkorderScreen(
             title = { Text(stringResource(R.string.workorder_detail)) },
             navigationIcon = {
                IconButton(onClick = {
-                  if(isInput) viewModel.add() else viewModel.update(id!!)
+                  if(isInput) viewModel.add() else viewModel.update()
                   if(errorState.up) {
                      navController.navigate(route = NavScreen.WorkordersList.route) {
                         popUpTo(route = NavScreen.WorkorderDetail.route) { inclusive = true }
@@ -132,71 +134,100 @@ fun WorkorderScreen(
             .verticalScroll(state = rememberScrollState())
       ) {
 
-         val workorder = viewModel.getWorkorderFromState()
+         if(isInput) {
+            viewModel.onCreatedChange(zonedDateTimeNow())
 
-         if(workorder.state != WorkState.Default) {
-            workorder.person?.let {
-               PersonCard(
-                  firstName = it.firstName,
-                  lastName = it.lastName,
-                  email = it.email,
-                  phone = it.phone,
-                  imagePath = it.imagePath
+            Column(modifier = Modifier.padding(top = 8.dp)) {
+               Text(
+                  text = zonedDateTimeString(viewModel.created),
+                  modifier = Modifier.fillMaxWidth().align(Alignment.End),
+                  style = MaterialTheme.typography.bodySmall,
+               )
+               OutlinedTextField(
+                  value = viewModel.title,                          // State ↓
+                  onValueChange = { viewModel.onTitleChange(it) },  // Event ↑
+                  modifier = Modifier.fillMaxWidth(),
+                  label = { Text(text = stringResource(id = R.string.title)) },
+                  textStyle = MaterialTheme.typography.bodyMedium,
+                  singleLine = true
+               )
+               OutlinedTextField(
+                  value = viewModel.description,                          // State ↓
+                  onValueChange = { viewModel.onDescriptionChange(it) },  // Event ↑
+                  modifier = Modifier.fillMaxWidth(),
+                  label = { Text(text = stringResource(id = R.string.description)) },
+                  singleLine = false,
+                  textStyle = MaterialTheme.typography.bodyMedium
                )
             }
-         }
-         Text(
-            text = zonedDateTimeString(viewModel.created),
-            modifier = Modifier
-               .fillMaxWidth()
-               .align(Alignment.End),
-            style = MaterialTheme.typography.bodySmall,
-         )
-         OutlinedTextField(
-            value = viewModel.title,                          // State ↓
-            onValueChange = { viewModel.onTitleChange(it) },  // Event ↑
-            modifier = Modifier.fillMaxWidth(),
-            readOnly = viewModel.state != WorkState.Default,
-            label = { Text(text = stringResource(id = R.string.title)) },
-            textStyle = MaterialTheme.typography.bodyMedium,
-            singleLine = true
-         )
-         OutlinedTextField(
-            value = viewModel.description,                          // State ↓
-            onValueChange = { viewModel.onDescriptionChange(it) },  // Event ↑
-            modifier = Modifier.fillMaxWidth(),
-            readOnly = viewModel.state != WorkState.Default,
-            label = { Text(text = stringResource(id = R.string.description)) },
-            singleLine = false,
-            textStyle = MaterialTheme.typography.bodyMedium
-         )
+         } else {
 
-         if(workorder.state != WorkState.Default) {
-            val (state, time) = evalWorkorderStateAndTime(workorder)
+            val workorder = viewModel.getWorkorderFromState()
 
-            Row(modifier = Modifier.padding(top=16.dp),
-               horizontalArrangement = Arrangement.Absolute.Right,
-               verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (workorder.state != WorkState.Default) {
+               workorder.person?.let {
+                  PersonCard(
+                     firstName = it.firstName,
+                     lastName = it.lastName,
+                     email = it.email,
+                     phone = it.phone,
+                     imagePath = it.imagePath
+                  )
+               }
+            }
 
-               Text(
-                  text = time,
-                  style = MaterialTheme.typography.bodyMedium,
-                  modifier = Modifier
-                     .padding(start = 4.dp)
-                     .weight(0.6f)
-               )
-               FilledTonalButton(
-                  onClick = {},
-                  enabled = false,
-                  modifier = Modifier
-                     .padding(end = 4.dp)
-                     .weight(0.4f)
+            Text(
+               text = zonedDateTimeString(viewModel.created),
+               modifier = Modifier.fillMaxWidth().align(Alignment.End),
+               style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+               value = viewModel.title,                          // State ↓
+               onValueChange = { viewModel.onTitleChange(it) },  // Event ↑
+               modifier = Modifier.fillMaxWidth(),
+               readOnly = viewModel.state != WorkState.Default,
+               label = { Text(text = stringResource(id = R.string.title)) },
+               textStyle = MaterialTheme.typography.bodyMedium,
+               singleLine = true
+            )
+            OutlinedTextField(
+               value = viewModel.description,                          // State ↓
+               onValueChange = { viewModel.onDescriptionChange(it) },  // Event ↑
+               modifier = Modifier.fillMaxWidth(),
+               readOnly = viewModel.state != WorkState.Default,
+               label = { Text(text = stringResource(id = R.string.description)) },
+               singleLine = false,
+               textStyle = MaterialTheme.typography.bodyMedium
+            )
+
+
+            if(workorder.state != WorkState.Default) {
+
+               val (state, time) = evalWorkorderStateAndTime(workorder)
+
+               Row(modifier = Modifier.padding(top = 16.dp),
+                  horizontalArrangement = Arrangement.Absolute.Right,
+                  verticalAlignment = Alignment.CenterVertically
                ) {
                   Text(
-                     text = state,
+                     text = time,
                      style = MaterialTheme.typography.bodyMedium,
+                     modifier = Modifier
+                        .padding(start = 4.dp)
+                        .weight(0.6f)
                   )
+                  FilledTonalButton(
+                     onClick = {},
+                     enabled = false,
+                     modifier = Modifier
+                        .padding(end = 4.dp)
+                        .weight(0.4f)
+                  ) {
+                     Text(
+                        text = state,
+                        style = MaterialTheme.typography.bodyMedium,
+                     )
+                  }
                }
             }
          }

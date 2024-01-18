@@ -8,31 +8,17 @@ import android.graphics.BitmapFactory
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
-import de.rogallab.mobile.domain.IPeopleRepository
-import de.rogallab.mobile.domain.IWorkordersRepository
-import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random
 
 class Seed @Inject constructor(
-   application: Application,
-   private val _peopleRepository: IPeopleRepository,
-   private val _workordersRepository: IWorkordersRepository,
-   private val _dispatcher: CoroutineDispatcher,
-   private val _exceptionHandler: CoroutineExceptionHandler
+   application: Application
 ) {
-
    private val _context: Context = application.applicationContext
    private val _resources: Resources = application.resources
 
@@ -44,40 +30,46 @@ class Seed @Inject constructor(
       "Arndt", "Bauer", "Conrad", "Diehl", "Engel", "Fischer", "Grabe", "Hoffmann",
       "Imhof", "Jung", "Klein", "Lang", "Meier", "Neumann", "Peters", "Opitz",
       "Richter", "Schmidt", "Thormann", "Ulrich", "Vogel", "Wagner", "Zander")
-
    private val _emailProvider = mutableListOf("gmail.com", "icloud.com", "outlook.com", "yahoo.com",
       "t-online.de", "gmx.de", "freenet.de", "mailbox.org")
 
-   private var _imagesUri = listOf<String>()
+   var people = listOf<Person>()
+   var workorders = listOf<Workorder>()
+   var imagesUri = listOf<String>()
 
+   var person01: Person = Person()
+   var person02: Person = Person()
+   var person03: Person = Person()
+   var person04: Person = Person()
+   var person05: Person = Person()
+   var person06: Person = Person()
 
-   fun initDatabase() {
-      val coroutineScope = CoroutineScope(Job() + _dispatcher + _exceptionHandler)
+   var workorder01: Workorder = Workorder()
+   var workorder02: Workorder = Workorder()
+   var workorder03: Workorder = Workorder()
+   var workorder04: Workorder = Workorder()
+   var workorder05: Workorder = Workorder()
+   var workorder06: Workorder = Workorder()
 
-      val job = coroutineScope.launch {
-         var result: ResultData<Int> = _peopleRepository.count()
-         var countPeople = 0;
-         if(result is ResultData.Success) {  countPeople = result.data  }
+   init {
+      imagesUri = initializeImages()
+      people = initializePeople(imagesUri)
+      workorders = initializeWorkorders()
 
-         result = _workordersRepository.count()
-         var countWorkorders = 0;
-         if(result is ResultData.Success) {  countWorkorders = result.data  }
+      person01 = people[0]
+      person02 = people[1]
+      person03 = people[2]
+      person04 = people[3]
+      person05 = people[4]
+      person06 = people[5]
 
-         if(countPeople == 0 && countWorkorders == 0) {
-            _imagesUri = initializeImages()
-            val people = initializePeople(_imagesUri)
-            val workorders = initializeWorkorders()
-            coroutineScope.async {
-               _peopleRepository.addAll(people)
-            }.await()
-            coroutineScope.async {
-               _workordersRepository.addAll(workorders)
-            }.await()
-         }
-      }
-      coroutineScope.launch {
-         job.join()
-      }
+      workorder01 = workorders[0]
+      workorder02 = workorders[1]
+      workorder03 = workorders[2]
+      workorder04 = workorders[3]
+      workorder05 = workorders[4]
+      workorder06 = workorders[5]
+
    }
 
    private fun initializeImages(): List<String> {
@@ -111,7 +103,7 @@ class Seed @Inject constructor(
    }
 
    fun disposeImages() {
-      _imagesUri.forEach { uriPath ->
+      imagesUri.forEach { uriPath ->
          logDebug("ok>disposeImages      .", "Uri $uriPath")
          deleteFileOnInternalStorage(uriPath)
       }
@@ -121,7 +113,7 @@ class Seed @Inject constructor(
       val people = mutableListOf<Person>()
       for (index in 0..<_firstNames.size) {
          val s = (index+1).toString().padStart(2,'0')
-         val id = UUID.fromString(s+"000000-0000-0000-0000-000000000000");
+         val id = UUID.fromString(s+"000000-0000-0000-0000-000000000000")
          val firstName = _firstNames[index]
          val lastName = _lastNames[index]
          val email =
@@ -145,16 +137,16 @@ class Seed @Inject constructor(
       people.add(person)
 
       if(imagesUri.size == 10) {
-         people[0].imagePath = _imagesUri[0]
-         people[1].imagePath = _imagesUri[5]
-         people[2].imagePath = _imagesUri[1]
-         people[3].imagePath = _imagesUri[6]
-         people[4].imagePath = _imagesUri[2]
-         people[5].imagePath = _imagesUri[7]
-         people[6].imagePath = _imagesUri[3]
-         people[7].imagePath = _imagesUri[8]
-         people[8].imagePath = _imagesUri[4]
-         people[9].imagePath = _imagesUri[9]
+         people[0].imagePath = imagesUri[0]
+         people[1].imagePath = imagesUri[5]
+         people[2].imagePath = imagesUri[1]
+         people[3].imagePath = imagesUri[6]
+         people[4].imagePath = imagesUri[2]
+         people[5].imagePath = imagesUri[7]
+         people[6].imagePath = imagesUri[3]
+         people[7].imagePath = imagesUri[8]
+         people[8].imagePath = imagesUri[4]
+         people[9].imagePath = imagesUri[9]
       }
       return people
    }
@@ -226,6 +218,4 @@ class Seed @Inject constructor(
       )
       return workorders
    }
-
-
 }

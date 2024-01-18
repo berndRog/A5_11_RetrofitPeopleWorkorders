@@ -40,14 +40,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
-import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.ui.composables.EventEffect
-import de.rogallab.mobile.ui.composables.HandleUiStateError
-import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
@@ -61,12 +57,13 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
-fun WorkordersSwipeListScreen(
+fun WorkordersListScreen(
    navController: NavController,
    viewModel: WorkordersViewModel
 ) {         //12345678901234567890123
    val tag = "ok>WorkordersListScr  ."
 
+   val workordersState: WorkorderUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
    val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
    BackHandler(
@@ -79,9 +76,6 @@ fun WorkordersSwipeListScreen(
          )
       }
    )
-
-   val uiStateListWorkorderFlow: UiState<List<Workorder>> by viewModel.uiStateListWorkorderFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStateListWorkorderFlow,"UiState List<Workorder>", tag )
 
    val snackbarHostState = remember { SnackbarHostState() }
    val coroutineScope = rememberCoroutineScope()
@@ -130,11 +124,7 @@ fun WorkordersSwipeListScreen(
             )
          }
       }) { innerPadding ->
-
-      if (uiStateListWorkorderFlow == UiState.Empty) {
-         logDebug(tag, "uiStatePeople.Empty")
-         // nothing to do
-      } else if (uiStateListWorkorderFlow == UiState.Loading) {
+      if (workordersState.isLoading) {
          logDebug(tag, "uiStatePeople.Loading")
          Column(
             modifier = Modifier
@@ -146,18 +136,9 @@ fun WorkordersSwipeListScreen(
          ) {
             CircularProgressIndicator(modifier = Modifier.size(160.dp))
          }
-      } else if (uiStateListWorkorderFlow is UiState.Success<List<Workorder>> ||
-         uiStateListWorkorderFlow is UiState.Error) {
-
-         var list: MutableList<Workorder> = remember { mutableListOf() }
-         if (uiStateListWorkorderFlow is UiState.Success) {
-            (uiStateListWorkorderFlow as UiState.Success<List<Workorder>>).data?.let{
-               list = it as MutableList<Workorder>
-               logVerbose(tag, "uiStateWorkorderFlow.Success items.size ${list.size}")
-            }
-         }
-
-         list.sortBy { it.state }
+      } else if (workordersState.isSuccessful && workordersState.workorders.isNotEmpty()) {
+         var items: MutableList<Workorder> = workordersState.workorders
+            .sortedBy { it.state } as MutableList<Workorder>
 
          LazyColumn(
             modifier = Modifier
@@ -166,19 +147,17 @@ fun WorkordersSwipeListScreen(
                .padding(horizontal = 8.dp),
             state = rememberLazyListState()
          ) {
-            items(items = list) { workorder ->
+            items(items = items) { workorder ->
                val (state, time) = evalWorkorderStateAndTime(workorder)
-
                val dismissState = rememberDismissState(
                   confirmValueChange = {
                      if (it == DismissValue.DismissedToEnd) {
                         logDebug("ok>SwipeToDismiss", "-> Detail ${workorder.id}")
                         navController.navigate(NavScreen.WorkorderDetail.route + "/${workorder.id}")
                         return@rememberDismissState true
-                     }  else if (it == DismissValue.DismissedToStart) {
+                     } else if (it == DismissValue.DismissedToStart) {
                         logDebug("==>SwipeToDismiss().", "-> Delete")
                         viewModel.remove(workorder.id)
-
                         val job = coroutineScope.launch {
                            showErrorMessage(
                               snackbarHostState = snackbarHostState,
@@ -217,39 +196,36 @@ fun WorkordersSwipeListScreen(
                      }
                   }
                )
-            }
-         }
-         if (uiStateListWorkorderFlow is UiState.Error) {
-            HandleUiStateError(
-               uiStateFlow = uiStateListWorkorderFlow,
-               actionLabel = "Ok",
-               onErrorAction = { },
-               snackbarHostState = snackbarHostState,
-               navController = navController,
-               routePopBack = NavScreen.WorkordersList.route,
-               onUiStateFlowChange = { },
-               tag = tag
-            )
-         }
-      }
+            } // items
+         } // lazy Column
+      } // state successful
+   } // Scaffold
 
-      EventEffect(
-         event = errorState.errorEvent,
-         onHandled = viewModel::onErrorEventHandled
-      ) { errorMessage: String ->
+   EventEffect(
+      event = errorState.errorEvent,
+      onHandled = viewModel::onErrorEventHandled
+   ) { it: String ->
+      val job = coroutineScope.launch {
          snackbarHostState.showSnackbar(
-            message = errorMessage,
+            message = it,
             actionLabel = "ok",
             withDismissAction = false,
             duration = SnackbarDuration.Short
          )
+      } // show snackbar
+      coroutineScope.launch {
+         // wait for snackbar to disappear
+         job.join()
+         // error event handled
+         viewModel.onErrorEventHandled()
+         // navigate back
          if (errorState.back) {
             logInfo(tag, "Back Navigation (Abort)")
             navController.popBackStack(
-               route = NavScreen.WorkordersList.route,
+               route = NavScreen.PeopleList.route,
                inclusive = false
             )
          }
-      }
+      } // navigate
    }
 }

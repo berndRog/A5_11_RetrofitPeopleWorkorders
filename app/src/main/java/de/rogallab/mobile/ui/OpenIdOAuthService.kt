@@ -1,11 +1,4 @@
 package de.rogallab.mobile.ui
-
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-
-
 /*
 The configuration file MUST contain a JSON object.
 The following properties can be specified:

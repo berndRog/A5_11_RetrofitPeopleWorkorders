@@ -5,7 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import de.rogallab.mobile.data.seed.Seed
+import de.rogallab.mobile.data.seed.SeedDatabase
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.ui.permissions.PermissionCamera
@@ -16,7 +16,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-   private val _seed: Seed
+   private val _seedDatabase: SeedDatabase
 ) : ViewModel() {
 
    // required permissions
@@ -31,13 +31,13 @@ class MainViewModel @Inject constructor(
    val visiblePermissionQueue: SnapshotStateList<String> = mutableStateListOf()
 
    init{
-      _seed.initDatabase()
+      _seedDatabase.initDatabase()
    }
 
    override fun onCleared() {
       super.onCleared()
       logInfo(tag, "onCleared()")
-      _seed.disposeImages()
+      _seedDatabase.disposeImages()
    }
 
    fun addPermission(

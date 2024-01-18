@@ -31,12 +31,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.getString
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.utilities.logDebug
-import de.rogallab.mobile.ui.people.ErrorState
 import de.rogallab.mobile.ui.people.PeopleViewModel
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun InputNameMailPhone(
    firstName: String,                        // State ↓

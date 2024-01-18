@@ -59,6 +59,7 @@ fun PersonScreen(
          LaunchedEffect(Unit) {
             logDebug(tag, "ReadById()")
             viewModel.readById(id)
+            viewModel.onIdChange(id)
          }
       } ?: run {
          viewModel.triggerErrorEvent(

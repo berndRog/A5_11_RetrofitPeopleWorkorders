@@ -1,6 +1,5 @@
 package de.rogallab.mobile.data.models
 
-import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import de.rogallab.mobile.domain.utilities.as8
@@ -15,8 +14,8 @@ data class PersonDto (
    var imagePath: String? = null,
    @PrimaryKey
    val id: UUID = UUID.randomUUID(),
-   @Embedded  // Workorder -> Adress [0..1]
-   var address: AddressDto? = null
+   //@Embedded  // Workorder -> Adress [0..1]
+   //var address: AddressDto? = null
 ) {
    fun asString() : String = "$firstName $lastName ${id.as8()}"
 }

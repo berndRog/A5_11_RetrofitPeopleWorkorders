@@ -25,9 +25,9 @@ data class Person (
    }
 
    fun removeWorkorder(workorder: Workorder) {
+      workorders.remove(workorder)
       workorder.state = WorkState.Default
       workorder.person = null
       workorder.personId = null
-      workorders.remove(workorder)
    }
 }

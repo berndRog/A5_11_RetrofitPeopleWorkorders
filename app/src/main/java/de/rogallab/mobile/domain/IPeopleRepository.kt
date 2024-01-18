@@ -1,7 +1,5 @@
 package de.rogallab.mobile.domain
 
-import de.rogallab.mobile.data.models.PersonDto
-import de.rogallab.mobile.data.models.WorkorderDto
 import de.rogallab.mobile.domain.entities.Person
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -17,7 +15,7 @@ interface IPeopleRepository {
    suspend fun update(person: Person): ResultData<Unit>
    suspend fun remove(person: Person): ResultData<Unit>
 
-   suspend fun selectByIdWithWorkorders(id: UUID): ResultData<Person?>
+// suspend fun selectByIdWithWorkorders(id: UUID): ResultData<Person?>
    suspend fun findByIdWithWorkorders(id:UUID): ResultData<Person?>
 
    // Webservice
@@ -26,5 +24,6 @@ interface IPeopleRepository {
    suspend fun post(person: Person): ResultData<Unit>
    suspend fun put(person: Person): ResultData<Unit>
    suspend fun delete(person: Person): ResultData<Unit>
+
 }
 

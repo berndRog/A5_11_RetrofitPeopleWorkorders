@@ -4,7 +4,6 @@ import de.rogallab.mobile.data.network.httpStatusMessage
 import de.rogallab.mobile.domain.utilities.logError
 import retrofit2.HttpException
 import java.io.IOException
-import kotlin.coroutines.cancellation.CancellationException
 
 //sealed class Resource<T>(val data: T? = null, val message: String? = null) {
 //   class Success<T>(data: T?): Resource<T>(data)

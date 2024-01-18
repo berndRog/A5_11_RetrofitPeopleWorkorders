@@ -32,10 +32,8 @@ fun toPerson(personDto:PersonDto): Person = Person(
    imagePath = personDto.imagePath,
    id = personDto.id,
    workorders = mutableListOf(),
-   address = personDto.address?.let{ toAddress(it) }
+   //address = personDto.address?.let{ toAddress(it) }
 )
-fun toPeople(peopleDto:List<PersonDto>): List<Person> =
-   peopleDto.map { personDto -> toPerson(personDto) }
 
 fun toPersonDto(person:Person): PersonDto = PersonDto(
    firstName = person.firstName,
@@ -44,10 +42,9 @@ fun toPersonDto(person:Person): PersonDto = PersonDto(
    phone = person.phone,
    imagePath = person.imagePath,
    id = person.id,
-   address = person.address?.let{ toAddressDto(it) }
+   //address = person.address?.let{ toAddressDto(it) }
 )
-fun toPeopleDto(people:List<Person>): List<PersonDto> =
-   people.map { person -> toPersonDto(person) }
+
 
 fun toWorkorder(workorderDto:WorkorderDto): Workorder = Workorder(
    title = workorderDto.title,
@@ -61,23 +58,21 @@ fun toWorkorder(workorderDto:WorkorderDto): Workorder = Workorder(
    id = workorderDto.id,
    person = null,
    personId = workorderDto.personId,
-   address = workorderDto.address?.let{ toAddress(it) }
+   //address = workorderDto.address?.let{ toAddress(it) }
 )
-fun toWorkorders(workorderDtos: List<WorkorderDto>): List<Workorder> =
-   workorderDtos.map { workorderDto -> toWorkorder(workorderDto) }
 
-fun Workorder.toWorkorderDto(): WorkorderDto = WorkorderDto(
-   title = this.title,
-   description = this.description,
-   created = toZuluString(this.created),
-   started = toZuluString(this.started),
-   completed = toZuluString(this.completed),
-   state = this.state,
-   duration = this.duration.toMillis(),
-   remark = this.remark,
-   id = this.id,
-   personId = this.personId,
-   address = this.address?.let{ toAddressDto(it) }
+fun toWorkorderDto(workorder: Workorder): WorkorderDto = WorkorderDto(
+   title = workorder.title,
+   description = workorder.description,
+   created = toZuluString(workorder.created),
+   started = toZuluString(workorder.started),
+   completed = toZuluString(workorder.completed),
+   state = workorder.state,
+   duration = workorder.duration.toMillis(),
+   remark = workorder.remark,
+   id = workorder.id,
+   personId = workorder.personId,
+   //address = this.address?.let{ toAddressDto(it) }
 )
 
 fun toPerson(personDtoWithWorkorderDtos:PersonDtoWithWorkorderDtos): Person {

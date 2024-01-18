@@ -42,14 +42,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.UiState
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.ui.composables.EventEffect
-import de.rogallab.mobile.ui.composables.HandleUiStateError
-import de.rogallab.mobile.ui.composables.LogUiStates
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
@@ -60,14 +57,21 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PeopleSwipeListScreen(
+fun PeopleListScreen(
    navController: NavController,
    viewModel: PeopleViewModel
 ) {
    val tag = "ok>PeopleListScreen   ."
 
-   val uiStateListPersonFlow: UiState<List<Person>> by viewModel.uiStateListFlow.collectAsStateWithLifecycle()
-   LogUiStates(uiStateListPersonFlow,"UiState List<Person>", tag )
+  // https://alexzh.com/jetpack-compose-pull-to-refresh/
+  // https://canlioya.medium.com/customise-pull-to-refresh-on-android-with-jetpack-compose-24a7119a4b94
+//   val pullRefreshState = rememberPullRefreshState(
+//      refreshing = state.isLoading,
+//      onRefresh = viewModel::loadOrders
+//   )
+
+   val peopleState: PeopleUiState by viewModel.stateFlowPeople.collectAsStateWithLifecycle()
+   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
    val snackbarHostState = remember { SnackbarHostState() }
    val coroutineScope = rememberCoroutineScope()
@@ -113,13 +117,10 @@ fun PeopleSwipeListScreen(
                actionOnNewLine = true
             )
          }
-      }) { innerPadding ->
-
-      if (uiStateListPersonFlow == UiState.Empty) {
-         logDebug(tag, "uiStatePeople.Empty")
-         // nothing to do
-      } else if (uiStateListPersonFlow == UiState.Loading) {
-         logDebug(tag, "uiStatePeople.Loading")
+   }) { innerPadding ->
+      // nothing to do
+      if (peopleState.isLoading) {
+         logDebug(tag, "peopleState Loading")
          Column(
             modifier = Modifier
                .padding(bottom = innerPadding.calculateBottomPadding())
@@ -130,18 +131,10 @@ fun PeopleSwipeListScreen(
          ) {
             CircularProgressIndicator(modifier = Modifier.size(160.dp))
          }
-      } else if (uiStateListPersonFlow is UiState.Success<List<Person>> ||
-         uiStateListPersonFlow is UiState.Error ) {
-
-         var list: MutableList<Person> = remember { mutableListOf<Person>() }
-         if (uiStateListPersonFlow is UiState.Success) {
-            (uiStateListPersonFlow as UiState.Success<List<Person>>).data?.let{
-               if(it.size > 0) {
-                  list = it as MutableList<Person>
-                  logVerbose(tag, "uiStatePeople.Success items.size ${list.size}")
-               }
-            }
-         }
+      } else if (peopleState.isSuccessful && peopleState.people.isNotEmpty()) {
+         val items = peopleState.people
+            .sortedBy { it.lastName } as MutableList<Person>
+         logVerbose(tag, "peopleState Success items ${items.size}")
 
          LazyColumn(
             modifier = Modifier
@@ -150,8 +143,7 @@ fun PeopleSwipeListScreen(
                .padding(horizontal = 8.dp),
             state = rememberLazyListState()
          ) {
-            items(items = list) { person ->
-
+            items(items = items) { person ->
                val dismissState = rememberDismissState(
                   confirmValueChange = {
                      if (it == DismissValue.DismissedToEnd) {
@@ -160,9 +152,7 @@ fun PeopleSwipeListScreen(
                         return@rememberDismissState true
                      } else if (it == DismissValue.DismissedToStart) {
                         logDebug("==>SwipeToDismiss().", "-> Delete")
-//                      personRemoved = person
                         viewModel.remove(person.id)
-
                         val job = coroutineScope.launch {
                            showErrorMessage(
                               snackbarHostState = snackbarHostState,
@@ -180,7 +170,6 @@ fun PeopleSwipeListScreen(
                      return@rememberDismissState false
                   }
                )
-
                SwipeToDismiss(
                   state = dismissState,
                   modifier = Modifier.padding(vertical = 4.dp),
@@ -204,33 +193,28 @@ fun PeopleSwipeListScreen(
                   }
                )
             }
-         } // lazy Column
-
-         if (uiStateListPersonFlow is UiState.Error) {
-            HandleUiStateError(
-               uiStateFlow = uiStateListPersonFlow,
-               actionLabel = "Ok",
-               onErrorAction = { },
-               snackbarHostState = snackbarHostState,
-               navController = navController,
-               routePopBack = NavScreen.PeopleList.route,
-               onUiStateFlowChange = { },
-               tag = tag
-            )
          }
-      }
+      } // state success
+   } // Scaffold
 
-      val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
-      EventEffect(
-         event = errorState.errorEvent,
-         onHandled = viewModel::onErrorEventHandled
-      ){ it: String ->
+   EventEffect(
+      event = errorState.errorEvent,
+      onHandled = viewModel::onErrorEventHandled
+   ){ it: String ->
+      val job = coroutineScope.launch {
          snackbarHostState.showSnackbar(
             message = it,
             actionLabel = "ok",
             withDismissAction = false,
             duration = SnackbarDuration.Short
          )
+      }
+      coroutineScope.launch {
+         // wait for snackbar to disappear
+         job.join()
+         // error event handled
+         viewModel.onErrorEventHandled()
+         // navigate back
          if (errorState.back) {
             logInfo(tag, "Back Navigation (Abort)")
             navController.popBackStack(
@@ -238,8 +222,6 @@ fun PeopleSwipeListScreen(
                inclusive = false
             )
          }
-         // reset error state
-         //viewModel.onErrorStateChange(ErrorState())
       }
    }
 }

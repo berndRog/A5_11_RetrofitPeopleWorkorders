@@ -13,14 +13,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import de.rogallab.mobile.ui.people.PeopleSwipeListScreen
+import de.rogallab.mobile.ui.people.PeopleListScreen
 import de.rogallab.mobile.ui.people.PeopleViewModel
 import de.rogallab.mobile.ui.people.PersonScreen
 import de.rogallab.mobile.ui.people.PersonWorkorderDetailScreen
 import de.rogallab.mobile.ui.people.PersonWorkorderOverviewScreen
 import de.rogallab.mobile.ui.workorders.WorkorderScreen
-import de.rogallab.mobile.ui.workorders.WorkorderInputScreen
-import de.rogallab.mobile.ui.workorders.WorkordersSwipeListScreen
+import de.rogallab.mobile.ui.workorders.WorkordersListScreen
 import de.rogallab.mobile.ui.workorders.WorkordersViewModel
 import java.util.UUID
 
@@ -42,7 +41,7 @@ fun AppNavHost(
    ) {
 
       composable(NavScreen.PeopleList.route) {
-         PeopleSwipeListScreen(
+         PeopleListScreen(
             navController = navHostController,
             viewModel = peopleViewModel
          )
@@ -80,9 +79,10 @@ fun AppNavHost(
             UUID.fromString(it)
          }
          PersonWorkorderOverviewScreen(
-            personId = id,
+            id = id,
             navController = navHostController,
-            viewModel = peopleViewModel
+            peopleViewModel = peopleViewModel,
+            workordersViewModel = workordersViewModel
          )
       }
 
@@ -103,7 +103,7 @@ fun AppNavHost(
       composable(
          route = NavScreen.WorkordersList.route,
       ) {
-         WorkordersSwipeListScreen(
+         WorkordersListScreen(
             navController = navHostController,
             viewModel = workordersViewModel
          )
@@ -113,7 +113,7 @@ fun AppNavHost(
          route = NavScreen.WorkorderInput.route,
       ) {
          WorkorderScreen(
-            isInputScreen = false,
+            isInputScreen = true,
             id = null,
             navController = navHostController,
             viewModel = workordersViewModel

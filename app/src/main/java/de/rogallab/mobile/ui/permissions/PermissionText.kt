@@ -1,5 +1,4 @@
 package de.rogallab.mobile.ui.permissions
-import android.content.Context
 
 class PermissionCamera : IPermissionText {
    override fun getDescription(
