@@ -4,6 +4,7 @@ plugins {
    id("dagger.hilt.android.plugin")
    // kotlin("kapt")
    id("com.google.devtools.ksp")
+   id("kotlin-parcelize")
 }
 android {
    namespace = "de.rogallab.mobile"
@@ -123,7 +124,7 @@ dependencies {
 
    // Room Database
    // https://developer.android.com/jetpack/androidx/releases/room
-   val roomVersion = "2.6.0"
+   val roomVersion = "2.6.1"
    implementation("androidx.room:room-runtime:$roomVersion")
    implementation("androidx.room:room-ktx:$roomVersion")
 // kapt("androidx.room:room-compiler:$roomVersion")

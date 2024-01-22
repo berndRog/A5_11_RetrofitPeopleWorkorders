@@ -1,11 +1,13 @@
 package de.rogallab.mobile.ui.workorders
 
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.rogallab.mobile.domain.IWorkorderUseCases
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
@@ -14,27 +16,21 @@ import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
-import de.rogallab.mobile.ui.composables.handled
-import de.rogallab.mobile.ui.composables.trigger
-import de.rogallab.mobile.ui.people.ErrorState
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.ErrorState
+import de.rogallab.mobile.ui.navigation.NavScreen
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -44,10 +40,13 @@ import javax.inject.Inject
 @HiltViewModel
 class WorkordersViewModel @Inject constructor(
    private val _repository: IWorkordersRepository,
+   private val _useCases: IWorkorderUseCases,
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
    var dbChanged: Boolean = false
+
+   var isWebservice: Boolean = false
 
    private var _id: UUID = UUID.randomUUID()
    val id
@@ -122,9 +121,14 @@ class WorkordersViewModel @Inject constructor(
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
-      exception.localizedMessage?.let {
-         logError(tag, it)
-         triggerErrorEvent(message = it, up = true, back = false)
+      exception.localizedMessage?.let { message ->
+         logError(tag, message)
+
+
+        // _stateFlowError.update{ it.copy(message = message, isNavigation = false) }
+
+
+
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -144,18 +148,48 @@ class WorkordersViewModel @Inject constructor(
    }
 
    // Error State
-   private var _stateFlowError: MutableStateFlow<ErrorState> = MutableStateFlow(ErrorState())
-   val stateFlowError: StateFlow<ErrorState> = _stateFlowError.asStateFlow()
-   fun triggerErrorEvent(message: String, up: Boolean, back: Boolean) {
-      _stateFlowError.update { currentState ->
-         currentState.copy(errorEvent = trigger(message), up, back)
-      }
+   var errorState by mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
+      private set
+
+   fun showOnFailure(throwable: Throwable) =
+      showOnError(throwable.localizedMessage ?: "Unknown error")
+   fun showOnError(errorMessage: String) {
+      logError(tag, errorMessage)
+      errorState = errorState.copy(
+         errorParams = ErrorParams(
+            message = errorMessage,
+            actionLabel = "ok",
+            duration = SnackbarDuration.Short,
+            withDismissAction = false,
+            onDismissAction = {},
+            isNavigation = false
+         ),
+         onErrorHandled = ::onErrorEventHandled
+      )
    }
+   // show error and navigate back
+   fun showAndNavigateBackOnFailure(throwable: Throwable) =
+      showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
+   fun showAndNavigateBackOnFailure(errorMessage: String) {
+      logError(tag, errorMessage)
+      errorState = errorState.copy(
+         errorParams = ErrorParams(
+            message = errorMessage,
+            actionLabel = "ok",
+            duration = SnackbarDuration.Short,
+            withDismissAction = false,
+            onDismissAction = {},
+            isNavigation = true,
+            route = NavScreen.PeopleList.route
+         )
+      )
+   }
+
    fun onErrorEventHandled() {
-      _stateFlowError.update { currentState ->
-         currentState.copy(errorEvent = handled(), up = true, back = false)
-      }
+      logDebug(tag, "onErrorEventHandled()")
+      errorState = errorState.copy(errorParams = null)
    }
+
 
    fun onErrorAction() {
       logDebug(tag, "onErrorAction()")
@@ -164,54 +198,43 @@ class WorkordersViewModel @Inject constructor(
 
    // StateFlow for List Screens
    private var _stateWorkorders: WorkorderUiState by mutableStateOf(WorkorderUiState())
-   val stateFlowWorkorders: StateFlow<WorkorderUiState> = fetchWorkorder()
-      .onEach { result: ResultData<List<Workorder>> -> updateState(result) }
-      .map { _stateWorkorders }
+   val stateFlowWorkorders: StateFlow<WorkorderUiState> = flow {
+      _useCases.fetchWorkorders(isWebservice).collect { result: ResultData<List<Workorder>> ->
+         when (result) {
+            is ResultData.Loading -> {
+               _stateWorkorders = _stateWorkorders.loading()
+               emit(_stateWorkorders)
+            }
+            is ResultData.Success -> {
+               _stateWorkorders = _stateWorkorders.success(result.data)
+               emit(_stateWorkorders)
+            }
+            is ResultData.Failure -> showOnFailure(result.throwable)
+            else -> Unit
+         }
+      }
+   }  .catch { throwable ->
+      showOnFailure(throwable)
+   }  .flowOn(_dispatcher)
       .stateIn(
          viewModelScope,
          SharingStarted.WhileSubscribed(1_000),
          WorkorderUiState()
       )
 
-   private fun fetchWorkorder(): Flow<ResultData<List<Workorder>>> = flow {
-      emit(ResultData.Loading(true))
-      _repository.selectAll().collect { workorder: ResultData<List<Workorder>> ->
-         emit(workorder)
-      }
-   }  .catch {
-      emit(ResultData.Failure(it))
-   }  .flowOn(_dispatcher)
-
-   private fun updateState(result: ResultData<List<Workorder>>) {
-      when (result) {
-         is ResultData.Loading -> _stateWorkorders = _stateWorkorders.loading()
-         is ResultData.Success -> {
-            _stateWorkorders = _stateWorkorders.success(workorders = result.data)
-         }
-         is ResultData.Failure -> handleFailure(result, false, false)
-      }
-   }
-
-   private fun handleFailure(
-      result: ResultData<Any>,
-      up: Boolean = false,
-      back: Boolean = true    // default: back navigation
-   ) {
-      val message = result.errorMessageOrNull() ?: "Unknown error"
-      logError(tag, message)
-      triggerErrorEvent(message = message, up = up, back = back)
-   }
-
    fun readById(id: UUID) {
       _coroutineScope.launch {
-         when (val result = _repository.findById(id)) {
+         var result: ResultData<Workorder?>
+         if(isWebservice) result = _repository.getById(id)
+         else             result = _repository.findById(id)
+         when (result) {
             is ResultData.Success -> {
                result.data?.let { it: Workorder ->
                   setStateFromWorkorder(it)
                   dbChanged = false
                }
             }
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
@@ -220,21 +243,27 @@ class WorkordersViewModel @Inject constructor(
    fun add(w: Workorder? = null) {
       val workorder = w ?: getWorkorderFromState()
       _coroutineScope.launch {
-         when (val result = _repository.add(workorder)) {
+         var result: ResultData<Unit>
+         if(isWebservice) result = _repository.post(workorder)
+         else             result = _repository.add(workorder)
+         when (result) {
             is ResultData.Loading -> Unit
             is ResultData.Success -> dbChanged = true
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
          }
       }
    }
 
    fun update(w: Workorder? = null) {
-      val workOrder = w ?: getWorkorderFromState()
+      val workorder = w ?: getWorkorderFromState()
       _coroutineScope.launch {
-         when (val result = _repository.update(workOrder)) {
+         var result: ResultData<Unit>
+         if(isWebservice) result = _repository.put(workorder)
+         else             result = _repository.update(workorder)
+         when (result) {
             is ResultData.Loading -> Unit
             is ResultData.Success ->  dbChanged = true
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
          }
       }
    }
@@ -244,7 +273,7 @@ class WorkordersViewModel @Inject constructor(
       _coroutineScope.launch {
          when (val result = _repository.remove(workorder)) {
             is ResultData.Success -> dbChanged = true
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
@@ -262,7 +291,7 @@ class WorkordersViewModel @Inject constructor(
                logDebug(tag, "readById() ${workorder.asString()}")
                dbChanged = false
             }
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }

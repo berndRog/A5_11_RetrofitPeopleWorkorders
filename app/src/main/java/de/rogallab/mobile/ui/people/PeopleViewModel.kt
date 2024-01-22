@@ -1,11 +1,15 @@
 package de.rogallab.mobile.ui.people
 
+import android.content.Context
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IPeopleUseCases
 import de.rogallab.mobile.domain.ImagesRepository
@@ -14,8 +18,9 @@ import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
-import de.rogallab.mobile.ui.composables.handled
-import de.rogallab.mobile.ui.composables.trigger
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.ErrorState
+import de.rogallab.mobile.ui.navigation.NavScreen
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +34,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -41,8 +45,10 @@ class PeopleViewModel @Inject constructor(
    private val _useCases: IPeopleUseCases,
    private val _repository: IPeopleRepository,
    private val _imagesRepository: ImagesRepository,
+//   private val _savedStateHandle: SavedStateHandle,
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
+
 
    var dbChanged: Boolean = false
    var isWebservice: Boolean = true
@@ -78,7 +84,6 @@ class PeopleViewModel @Inject constructor(
    fun onEmailChange(value: String) {
       if (value != _email) _email = value
    }
-
    private var _phone: String? by mutableStateOf(null)
    val phone: String?
       get() = _phone
@@ -89,7 +94,6 @@ class PeopleViewModel @Inject constructor(
    private var _imagePath: String? by mutableStateOf(null)
    val imagePath: String?
       get() = _imagePath
-
    fun onImagePathChange(value: String?) {
       if (value != _imagePath) _imagePath = value
    }
@@ -101,7 +105,9 @@ class PeopleViewModel @Inject constructor(
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
       exception.localizedMessage?.let { message ->
          logError(tag, message)
-         triggerErrorEvent(message = message, up = false, back = false)
+
+
+
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -119,30 +125,49 @@ class PeopleViewModel @Inject constructor(
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-   //   // StateFlow for List Screens
-//   val uiStateListFlow: StateFlow<UiState<List<Person>>> = flow {
-//      _useCases.readPeople().collect { it ->
-//         emit(it)
-//      }
-//   }.stateIn(
-//      viewModelScope,
-//      SharingStarted.WhileSubscribed(1_000),
-//      UiState.Empty
-//   )
-   // Error State
-   private var _stateFlowError: MutableStateFlow<ErrorState> = MutableStateFlow(ErrorState())
-   val stateFlowError: StateFlow<ErrorState> = _stateFlowError.asStateFlow()
 
-   fun triggerErrorEvent(message: String, up: Boolean, back: Boolean) {
-      _stateFlowError.update { currentState ->
-         currentState.copy(errorEvent = trigger(message), up, back)
-      }
+   // Error State = ViewModel (one time) events
+   // https://developer.android.com/topic/architecture/ui-layer/events#handle-viewmodel-events
+   var errorState by mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
+      private set
+
+   fun showOnFailure(throwable: Throwable) =
+      showOnError(throwable.localizedMessage ?: "Unknown error")
+   fun showOnError(errorMessage: String) {
+      logError(tag, errorMessage)
+      errorState = errorState.copy(
+         errorParams = ErrorParams(
+            message = errorMessage,
+            actionLabel = "ok",
+            duration = SnackbarDuration.Short,
+            withDismissAction = false,
+            onDismissAction = {},
+            isNavigation = false
+         ),
+         onErrorHandled = ::onErrorEventHandled
+      )
+   }
+   // show error and navigate back
+   fun showAndNavigateBackOnFailure(throwable: Throwable) =
+      showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
+   fun showAndNavigateBackOnFailure(errorMessage: String) {
+      logError(tag, errorMessage)
+      errorState = errorState.copy(
+         errorParams = ErrorParams(
+            message = errorMessage,
+            actionLabel = "ok",
+            duration = SnackbarDuration.Short,
+            withDismissAction = false,
+            onDismissAction = {},
+            isNavigation = true,
+            route = NavScreen.PeopleList.route
+         )
+      )
    }
 
    fun onErrorEventHandled() {
-      _stateFlowError.update { currentState ->
-         currentState.copy(errorEvent = handled(), up = true, back = false)
-      }
+      logDebug(tag, "onErrorEventHandled()")
+      errorState = errorState.copy(errorParams = null)
    }
    // error handling
    fun onErrorAction() {
@@ -150,7 +175,12 @@ class PeopleViewModel @Inject constructor(
       // toDo
    }
 
+   // State for PeopleList
+   // private var _savedState: StateFlow<PeopleUiState> = _savedStateHandle.getStateFlow("peopleState", PeopleUiState())
+
+
    private var _statePeople: PeopleUiState by mutableStateOf(PeopleUiState())
+
    val stateFlowPeople: StateFlow<PeopleUiState> = flow {
       _useCases.fetchPeople(isWebservice).collect { result: ResultData<List<Person>> ->
          when (result) {
@@ -159,46 +189,20 @@ class PeopleViewModel @Inject constructor(
                emit(_statePeople)
             }
             is ResultData.Success -> {
-               _statePeople = _statePeople.success(people = result.data)
+               _statePeople = _statePeople.success(result.data)
                emit(_statePeople)
             }
-            is ResultData.Failure -> {
-               handleFailure(result, false, false)
-               _statePeople = _statePeople.failure(result.throwable)
-               emit(_statePeople)
-            }
+            is ResultData.Failure -> showOnFailure(result.throwable)
          }
       }
-   }  .catch { it ->
-         handleFailure(it, false, false)
-         _statePeople = _statePeople.failure(it)
-         emit(_statePeople)
+   }  .catch { throwable ->
+      showOnFailure(throwable)
    }  .flowOn(_dispatcher)
       .stateIn(
          viewModelScope,
          SharingStarted.WhileSubscribed(1_000),
          PeopleUiState()
       )
-
-   private fun handleFailure(
-      result: ResultData<Any>,
-      up: Boolean = false,
-      back: Boolean = true    // default: back navigation
-   ) {
-      val message = result.errorMessageOrNull() ?: "Unknown error"
-      logError(tag, message)
-      triggerErrorEvent(message = message, up = up, back = back)
-   }
-
-   private fun handleFailure(
-      throwable: Throwable,
-      up: Boolean = false,
-      back: Boolean = true    // default: back navigation
-   ) {
-      val message = throwable.localizedMessage ?: "Unknown error"
-      logError(tag, message)
-      triggerErrorEvent(message = message, up = up, back = back)
-   }
 
    fun readById(id: UUID) {
       _coroutineScope.launch {
@@ -213,7 +217,7 @@ class PeopleViewModel @Inject constructor(
                   dbChanged = false
                }
             }
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
@@ -223,19 +227,18 @@ class PeopleViewModel @Inject constructor(
       val person = p ?: getPersonFromState()
       _coroutineScope.launch {
          val result: ResultData<Unit>
-         if (isWebservice) result = _repository.add(person)
-         else              result = _repository.post(person)
+         if (isWebservice) result = _repository.post(person)
+         else              result = _repository.add(person)
          when (result) {
             is ResultData.Success -> dbChanged = true
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
-//         if(isWebservice) {
-//            person.imagePath?.let{
-//               _imagesRepository.upload(it)
-//            }
-//         }
-
+         if(isWebservice) {
+            person.imagePath?.let{
+               _imagesRepository.upload(it)
+           }
+         }
       }
    }
 
@@ -247,7 +250,7 @@ class PeopleViewModel @Inject constructor(
          else             result = _repository.update(person)
          when (result) {
             is ResultData.Success -> dbChanged = true
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
@@ -261,7 +264,7 @@ class PeopleViewModel @Inject constructor(
          else             result = _repository.remove(person)
          when (result) {
             is ResultData.Success -> dbChanged = true
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
@@ -276,8 +279,7 @@ class PeopleViewModel @Inject constructor(
                   _person = person
                }
             }
-
-            is ResultData.Failure -> handleFailure(result)
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
@@ -316,6 +318,37 @@ class PeopleViewModel @Inject constructor(
       _imagePath = null
       _id = UUID.randomUUID()
    }
+
+
+   fun isValid(context: Context, viewModel: PeopleViewModel): Boolean {
+
+      if (viewModel.firstName.isEmpty() || viewModel.firstName.length < 2) {
+         val message = ContextCompat.getString(context, R.string.errorFirstNameTooShort)
+         viewModel.showOnError(message)
+         return true
+      }
+      if (viewModel.lastName.isEmpty() || viewModel.lastName.length < 2) {
+         val message = ContextCompat.getString(context, R.string.errorLastNameTooShort)
+         viewModel.showOnError(message)
+         return true
+      }
+      viewModel.email?.let {
+         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches()) {
+            val message = ContextCompat.getString(context, R.string.errorEmail)
+            viewModel.showAndNavigateBackOnFailure(message)
+            return true
+         }
+      }
+      viewModel.phone?.let {
+         if (!android.util.Patterns.PHONE.matcher(it).matches()) {
+            val message = ContextCompat.getString(context, R.string.errorPhone)
+            viewModel.showAndNavigateBackOnFailure(message)
+            return true
+         }
+      }
+      return false
+   }
+
 
    companion object {
       private const val tag = "ok>PeopleViewModel    ."

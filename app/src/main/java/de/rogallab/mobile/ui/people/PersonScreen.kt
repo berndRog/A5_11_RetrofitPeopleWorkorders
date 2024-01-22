@@ -13,7 +13,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -28,16 +27,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
-import de.rogallab.mobile.ui.composables.EventEffect
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.showAndRespondToError
 import de.rogallab.mobile.ui.composables.SelectAndShowImage
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.InputNameMailPhone
-import de.rogallab.mobile.ui.people.composables.isInputValid
+import de.rogallab.mobile.ui.people.composables.InputMail
+import de.rogallab.mobile.ui.people.composables.InputName
+import de.rogallab.mobile.ui.people.composables.InputPhone
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,11 +49,9 @@ fun PersonScreen(
    viewModel: PeopleViewModel,
 ) {
    var tag = "ok>PersonInputScreen ."
-   val isInput:Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
+   val isInput: Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
 
-   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
-
-   if (! isInput) {
+   if (!isInput) {
       tag = "ok>PersonDetailScreen ."
       id?.let {
          LaunchedEffect(Unit) {
@@ -62,8 +60,7 @@ fun PersonScreen(
             viewModel.onIdChange(id)
          }
       } ?: run {
-         viewModel.triggerErrorEvent(
-            message = "No id for person is given", up = false, back = true)
+         viewModel.showAndNavigateBackOnFailure("No id for person is given")
       }
    }
 
@@ -71,33 +68,25 @@ fun PersonScreen(
       enabled = true,
       onBack = {
          logInfo(tag, "Back Navigation (Abort)")
-         navController.popBackStack(
-            route = NavScreen.PeopleList.route,
-            inclusive = false
-         )
+         navController.navigate(route = NavScreen.PeopleList.route) {
+            popUpTo(route = NavScreen.PersonDetail.route) { inclusive = true }
+         }
       }
    )
 
    val context = LocalContext.current
    val snackbarHostState = remember { SnackbarHostState() }
-
    Scaffold(
       topBar = {
          TopAppBar(
             title = { Text(stringResource(R.string.person_detail)) },
             navigationIcon = {
                IconButton(onClick = {
-                  if (!isInputValid(context, viewModel)) {
-                     if(isInput) viewModel.add() else viewModel.update(id!!)
-                  }
-                  if (errorState.up) {
+                  if (!viewModel.isValid(context, viewModel)) {
+                     if (isInput) viewModel.add() else viewModel.update(id!!)
                      navController.navigate(route = NavScreen.PeopleList.route) {
-                        popUpTo(route = NavScreen.PeopleList.route) { inclusive = true }
+                        popUpTo(route = NavScreen.PersonDetail.route) { inclusive = true }
                      }
-                  }
-                  if (errorState.back) {
-                     navController.popBackStack(route = NavScreen.PeopleList.route,
-                        inclusive = false)
                   }
                }) {
                   Icon(
@@ -117,49 +106,48 @@ fun PersonScreen(
          }
       }
    ) { innerPadding ->
-
       Column(
          modifier = Modifier
-            .padding(top = innerPadding.calculateTopPadding(),
-               bottom = innerPadding.calculateBottomPadding())
+            .padding(paddingValues = innerPadding)
             .padding(horizontal = 8.dp)
             .fillMaxWidth()
             .verticalScroll(state = rememberScrollState())
       ) {
-         InputNameMailPhone(
-            firstName = viewModel.firstName,                         // State ↓
-            onFirstNameChange = { viewModel.onFirstNameChange(it) }, // Event ↑
-            lastName = viewModel.lastName,                           // State ↓
-            onLastNameChange = { viewModel.onLastNameChange(it) },   // Event ↑
-            email = viewModel.email,                                 // State ↓
-            onEmailChange = { viewModel.onEmailChange(it) },         // Event ↑
-            phone = viewModel.phone,                                 // State ↓
-            onPhoneChange = { viewModel.onPhoneChange(it) }          // Event ↑
+         InputName(
+            name = viewModel.firstName,                  // State ↓
+            onNameChange = viewModel::onFirstNameChange, // Event ↑
+            errorTooShort = stringResource(R.string.errorFirstNameTooShort),
+            errorTooLong = stringResource(R.string.errorFirstNameTooLong)
          )
-
+         InputName(
+            name = viewModel.lastName,                   // State ↓
+            onNameChange = viewModel::onLastNameChange,  // Event ↑
+            errorTooShort = stringResource(R.string.errorLastNameTooShort),
+            errorTooLong = stringResource(R.string.errorLastNameTooLong)
+         )
+         InputMail(
+            email = viewModel.email,                     // State ↓
+            onEmailChange = viewModel::onEmailChange,    // Event ↑
+         )
+         InputPhone(
+            phone = viewModel.phone,                     // State ↓
+            onPhoneChange = viewModel::onPhoneChange     // Event ↑
+         )
          SelectAndShowImage(
-            imagePath = viewModel.imagePath,                         // State ↓
-            onImagePathChanged = { viewModel.onImagePathChange(it) } // Event ↑
+            imagePath = viewModel.imagePath,                  // State ↓
+            onImagePathChanged = viewModel::onImagePathChange // Event ↑
          )
       }
+   }
 
-      EventEffect(
-         event = errorState.errorEvent,
-         onHandled = viewModel::onErrorEventHandled
-      ){ errorMessage: String ->
-         snackbarHostState.showSnackbar(
-            message = errorMessage,
-            actionLabel = "ok",
-            withDismissAction = false,
-            duration = SnackbarDuration.Short
+   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+      LaunchedEffect(params) {
+         showAndRespondToError(
+            errorParams = params,
+            snackbarHostState = snackbarHostState,
+            navController = navController,
+            onErrorEventHandled = viewModel::onErrorEventHandled
          )
-         if (errorState.back) {
-            logInfo(tag, "Back Navigation (Abort)")
-            navController.popBackStack(
-               route = NavScreen.PeopleList.route,
-               inclusive = false
-            )
-         }
       }
    }
 }

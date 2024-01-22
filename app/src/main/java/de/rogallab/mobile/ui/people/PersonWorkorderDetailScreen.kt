@@ -15,20 +15,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.WorkState
@@ -36,7 +33,8 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
-import de.rogallab.mobile.ui.composables.EventEffect
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.showAndRespondToError
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.people.composables.InputCompleted
@@ -53,16 +51,14 @@ fun PersonWorkorderDetailScreen(
 ) {        // 12345678901234567890123
    val tag = "ok>PersonWorkDetailScr."
 
-   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
    BackHandler(
       enabled = true,
       onBack = {
          logInfo(tag, "Back Navigation (Abort)")
-         navController.popBackStack(
-            route = NavScreen.PersonWorkorderOverview.route + "",
-            inclusive = false
-         )
+         navController.navigate(route = NavScreen.PeopleList.route) {
+            popUpTo(route = NavScreen.PersonWorkorderOverview.route) { inclusive = true }
+         }
       }
    )
 
@@ -72,9 +68,8 @@ fun PersonWorkorderDetailScreen(
          viewModel.readByIdWithPerson(workorderId)
       }
    } ?: run {
-      viewModel.triggerErrorEvent("No id for person is given", up = true, back = false)
+      //viewModel.onTriggerErrorEvent("No id for person is given", true)
    }
-
    val snackbarHostState = remember { SnackbarHostState() }
 
    Scaffold(
@@ -84,17 +79,8 @@ fun PersonWorkorderDetailScreen(
             navigationIcon = {
                IconButton(onClick = {
                   viewModel.update()
-                  if (errorState.up) {
-                     navController.navigate(
-                        route = NavScreen.PersonWorkorderOverview.route + "/${viewModel.assignedPerson!!.id}") {
-                        popUpTo(route = NavScreen.PersonWorkorderDetail.route) { inclusive = true }
-                     }
-                  }
-                  if(errorState.back) {
-                     navController.popBackStack(
-                        route = NavScreen.PersonWorkorderOverview.route + "/${viewModel.assignedPerson!!.id}",
-                        inclusive = false
-                     )
+                  navController.navigate(route = NavScreen.PeopleList.route) {
+                     popUpTo(route = NavScreen.PersonWorkorderDetail.route) { inclusive = true }
                   }
                }) {
                   Icon(
@@ -114,18 +100,15 @@ fun PersonWorkorderDetailScreen(
          }
       }
    ) { innerPadding ->
-
       Column(
          modifier = Modifier
-            .padding(top = innerPadding.calculateTopPadding())
-            .padding(bottom = innerPadding.calculateBottomPadding())
+            .padding(paddingValues = innerPadding)
             .padding(horizontal = 8.dp)
             .fillMaxWidth()
             .verticalScroll(state = rememberScrollState())
       ) {
-
          viewModel.assignedPerson?.let {
-            Column(modifier = Modifier.padding(bottom=16.dp)) {
+            Column(modifier = Modifier.padding(bottom = 16.dp)) {
                PersonCard(
                   firstName = it.firstName,
                   lastName = it.lastName,
@@ -168,7 +151,7 @@ fun PersonWorkorderDetailScreen(
             modifier = Modifier.padding(top = 8.dp)
          )
 
-         if(viewModel.state == WorkState.Started || viewModel.state == WorkState.Completed) {
+         if (viewModel.state == WorkState.Started || viewModel.state == WorkState.Completed) {
             OutlinedTextField(
                value = viewModel.remark,                          // State ↓
                onValueChange = { viewModel.onRemarkChange(it) },  // Event ↑
@@ -187,26 +170,17 @@ fun PersonWorkorderDetailScreen(
       }
    }
 
-   EventEffect(
-      event = errorState.errorEvent,
-      onHandled = viewModel::onErrorEventHandled
-   ){ errorMessage: String ->
-      snackbarHostState.showSnackbar(
-         message = errorMessage,
-         actionLabel = "ok",
-         withDismissAction = false,
-         duration = SnackbarDuration.Short
-      )
-      if (errorState.back) {
-         logInfo(tag, "Back Navigation (Abort)")
-         navController.popBackStack(
-            route = NavScreen.WorkordersList.route,
-            inclusive = false
+   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+      LaunchedEffect(params) {
+         showAndRespondToError(
+            errorParams = params,
+            snackbarHostState = snackbarHostState,
+            navController = navController,
+            onErrorEventHandled = viewModel::onErrorEventHandled
          )
       }
    }
 }
-
 
 class StateMachine(
    var started: Boolean = false,
@@ -214,46 +188,44 @@ class StateMachine(
    private var restarted: Boolean = false,
    var completed: Boolean = false,
 ) {
-
    fun start() {
-      if( !started ) {
+      if (!started) {
          started = true
          paused = false
          restarted = false
          completed = false
       } else {
-         logError("ok>State","Can't start, is already started")
+         logError("ok>State", "Can't start, is already started")
       }
    }
 
    fun pause() {
-      if(started || restarted) {
+      if (started || restarted) {
          started = false
          restarted = false
          paused = true
       } else {
-         logError("ok>State","Can't pause, if not started or restarted")
+         logError("ok>State", "Can't pause, if not started or restarted")
       }
    }
 
    fun restart() {
-      if(paused) {
+      if (paused) {
          restarted = true
          paused = false
       } else {
-         logError("ok>State","Can't restart, if not paused")
+         logError("ok>State", "Can't restart, if not paused")
       }
    }
 
    fun complete() {
-      if(started || paused) {
+      if (started || paused) {
          started = false
          paused = false
          restarted = false
          completed = true
       } else {
-         logError("ok>State","Can't complete, if not started or paused")
+         logError("ok>State", "Can't complete, if not started or paused")
       }
    }
-
 }

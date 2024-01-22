@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
 import de.rogallab.mobile.domain.utilities.logDebug
+import de.rogallab.mobile.domain.utilities.logVerbose
 
 @Composable
 fun SelectPhotoFromGallery(
@@ -42,7 +43,6 @@ fun SelectPhotoFromGallery(
    ) { uri: Uri? ->
       // get bitmap from content resolver (photo gallery)
       uri?.let {
-         logDebug(tag,"Get Bitmap ${it.path}")
          bitmap = if (Build.VERSION.SDK_INT < 28) {
             getBitmap(context.contentResolver, it)
          } else {
@@ -52,7 +52,7 @@ fun SelectPhotoFromGallery(
          // save bitmap to internal storage of the app
          bitmap?.let { bitmap ->
             writeImageToInternalStorage(context, bitmap)?.let { uriPath:String? ->
-               logDebug("ok>SelectPhotoFromGale.", "Storage $uriPath")
+               logVerbose(tag, "Storage $uriPath")
                onImagePathChanged(uriPath)  // Event ↑
             }
          }
@@ -62,7 +62,7 @@ fun SelectPhotoFromGallery(
    Button(
       modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth(),
       onClick = {
-         logDebug("ok>SelectPhotoFromGale.", "Click")
+         logVerbose(tag, "Click")
          galleryLauncher.launch("image/*")
       }
    ) {

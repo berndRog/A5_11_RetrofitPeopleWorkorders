@@ -22,7 +22,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismiss
@@ -48,8 +47,8 @@ import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
-import de.rogallab.mobile.ui.composables.EventEffect
 import de.rogallab.mobile.ui.composables.PersonCard
+import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.NavScreen
@@ -69,7 +68,7 @@ fun PersonWorkorderOverviewScreen(
    val tag = "ok>PersonWorkOverview."
 
    if(id == null) {
-      peopleViewModel.triggerErrorEvent(message ="No id for person is given", up = false, back = true)
+      peopleViewModel.showAndNavigateBackOnFailure("No id for person is given")
    }
    val personId: UUID by rememberSaveable { mutableStateOf(id!!)  }
 
@@ -79,16 +78,13 @@ fun PersonWorkorderOverviewScreen(
    }
 
    val workorderState: WorkorderUiState by workordersViewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
-   val errorState: ErrorState by peopleViewModel.stateFlowError.collectAsStateWithLifecycle()
 
    BackHandler(
       enabled = true,
       onBack = {
-         logInfo(tag, "Back Navigation (Abort)")
-         navController.popBackStack(
-            route = NavScreen.PeopleList.route,
-            inclusive = false
-         )
+         navController.navigate(route = NavScreen.PeopleList.route) {
+            popUpTo(route = NavScreen.PersonWorkorderOverview.route) { inclusive = true }
+         }
       }
    )
 
@@ -99,19 +95,9 @@ fun PersonWorkorderOverviewScreen(
             title = { Text(stringResource(R.string.personwork_overview)) },
             navigationIcon = {
                IconButton(onClick = {
-                  if (errorState.up) {
-                     logInfo(tag, "Reverse Navigation (Up) viewModel.update()")
                      navController.navigate(route = NavScreen.PeopleList.route) {
                         popUpTo(route = NavScreen.PeopleList.route) { inclusive = true }
                      }
-                  }
-                  if (errorState.back) {
-                     logInfo(tag, "Back Navigation, Error in viewModel.update()")
-                     navController.popBackStack(
-                        route = NavScreen.PeopleList.route,
-                        inclusive = false
-                     )
-                  }
                }) {
                   Icon(
                      imageVector = Icons.Default.ArrowBack,
@@ -145,14 +131,13 @@ fun PersonWorkorderOverviewScreen(
          }
       } else if (workorderState.isSuccessful && workorderState.workorders.isNotEmpty()) {
 
-         val defaultWorkorders = workorderState.workorders
+         val defaultWorkorders: List<Workorder> = workorderState.workorders
             .filter { it: Workorder -> it.state == WorkState.Default }
             .sortedBy { it.created }
 
          val assignedWorkorders = workorderState.workorders
             .filter { it: Workorder -> it.personId == personId }
-
-
+         
          Column(
             modifier = Modifier
                .padding(top = innerPadding.calculateTopPadding(),
@@ -195,24 +180,7 @@ fun PersonWorkorderOverviewScreen(
          }
       }
 
-      EventEffect(
-         event = errorState.errorEvent,
-         onHandled = peopleViewModel::onErrorEventHandled
-      ){ errorMessage: String ->
-         snackbarHostState.showSnackbar(
-            message = errorMessage,
-            actionLabel = "ok",
-            withDismissAction = false,
-            duration = SnackbarDuration.Short
-         )
-         if (errorState.back) {
-            logInfo(tag, "Back Navigation (Abort)")
-            navController.popBackStack(
-               route = NavScreen.PeopleList.route,
-               inclusive = false
-            )
-         }
-      }
+
    }
 }
 
@@ -282,11 +250,9 @@ private fun AssignedWorkorders(
             val dismissState = rememberDismissState(
                confirmValueChange = {
                   if (it == DismissValue.DismissedToEnd) {
-                     logDebug("ok>SwipeToDismiss", "-> Detail ${workorder.id}")
                      navController.navigate(NavScreen.PersonWorkorderDetail.route + "/${workorder.id}")
-                     return@rememberDismissState true
+                     true
                   } else if (it == DismissValue.DismissedToStart) {
-                     logDebug("ok>SwipeToDismiss", "-> Delete")
                      if(workorder.state != WorkState.Started &&
                         workorder.state != WorkState.Completed)   {
                         // unassign the workorder from the person
@@ -294,9 +260,11 @@ private fun AssignedWorkorders(
                         // update the workorder in the database
                         onUnAssignWorkorder(workorder)
                         navController.navigate(NavScreen.PersonWorkorderOverview.route + "/$personId")
-                        return@rememberDismissState true
-                     }                  }
-                  return@rememberDismissState false
+                        true
+                     }
+                     false
+                  }
+                  else false
                }
             )
             SwipeToDismiss(
@@ -308,12 +276,11 @@ private fun AssignedWorkorders(
                },
                dismissContent = {
                   Column {
-                     logVerbose(tag, "assigned ${workorder.asString()}")
                      WorkorderCard(
                         time = time,
                         state = state,
                         title = workorder.title,
-                        modifier = Modifier.padding(top = 8.dp)
+                        elevation = SetCardElevation(dismissState)
                      )
                   }
                }

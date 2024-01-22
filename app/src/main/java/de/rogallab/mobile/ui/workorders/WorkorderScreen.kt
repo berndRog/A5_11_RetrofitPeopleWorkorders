@@ -18,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -33,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.WorkState
@@ -41,10 +39,10 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
-import de.rogallab.mobile.ui.composables.EventEffect
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.showAndRespondToError
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.ErrorState
 import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import java.util.UUID
 
@@ -60,7 +58,6 @@ fun WorkorderScreen(
    val tag = "ok>WorkorderInputScr  ."
    val isInput:Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
 
-   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
    if (! isInput) {
       val tag = "ok>WorkorderDetailScr ."
@@ -71,8 +68,8 @@ fun WorkorderScreen(
             viewModel.onIdChange(id)
          }
       } ?: run {
-         viewModel.triggerErrorEvent(
-            message = "No id for workorder is given", up = false, back = true)
+//         viewModel.onTriggerErrorEvent(
+//            message = "No id for workorder is given", isNavigation = true)
       }
    }
 
@@ -95,17 +92,11 @@ fun WorkorderScreen(
             navigationIcon = {
                IconButton(onClick = {
                   if(isInput) viewModel.add() else viewModel.update()
-                  if(errorState.up) {
+                  //if(errorState.up) {
                      navController.navigate(route = NavScreen.WorkordersList.route) {
                         popUpTo(route = NavScreen.WorkorderDetail.route) { inclusive = true }
                      }
-                  }
-                  if(errorState.back) {
-                     navController.popBackStack(
-                        route = NavScreen.WorkordersList.route,
-                        inclusive = false
-                     )
-                  }
+
                }) {
                   Icon(
                      imageVector = Icons.Default.ArrowBack,
@@ -234,21 +225,13 @@ fun WorkorderScreen(
       }
    }
 
-   EventEffect(
-      event = errorState.errorEvent,
-      onHandled = viewModel::onErrorEventHandled
-   ) { errorMessage: String ->
-      snackbarHostState.showSnackbar(
-         message = errorMessage,
-         actionLabel = "ok",
-         withDismissAction = false,
-         duration = SnackbarDuration.Short
-      )
-      if (errorState.back) {
-         logInfo(tag, "Back Navigation (Abort)")
-         navController.popBackStack(
-            route = NavScreen.WorkordersList.route,
-            inclusive = false
+   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+      LaunchedEffect(params) {
+         showAndRespondToError(
+            errorParams = params,
+            snackbarHostState = snackbarHostState,
+            navController = navController,
+            onErrorEventHandled = viewModel::onErrorEventHandled
          )
       }
    }

@@ -214,5 +214,30 @@ class WordordersRepositoryImpl @Inject constructor(
          }
       }
 
+   override suspend fun put(workorder: Workorder): ResultData<Unit> =
+      withContext(_dispatcher) {
+         try {
+            // throw Exception("Error thrown in update()")
+            logDebug(tag, "update()")
+            val dto = toWorkorderDto(workorder)
+            _webservice.put(dto.id, dto)
+            return@withContext ResultData.Success(Unit)
+         } catch (t: Throwable) {
+            return@withContext ResultData.Failure(t)
+         }
+      }
+
+   override suspend fun delete(workorder: Workorder): ResultData<Unit> =
+      withContext(_dispatcher) {
+         try {
+            // throw Exception("Error thrown in remove()")
+            logDebug(tag, "remove()")
+            _webservice.delete(workorder.id)
+            return@withContext ResultData.Success(Unit)
+         } catch (t: Throwable) {
+            return@withContext ResultData.Failure(t)
+         }
+      }
+
 
 }

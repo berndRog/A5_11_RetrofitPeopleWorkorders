@@ -22,7 +22,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismiss
@@ -30,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,14 +43,15 @@ import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
-import de.rogallab.mobile.ui.composables.EventEffect
+import de.rogallab.mobile.domain.utilities.logVerbose
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.showAndRespondToError
+import de.rogallab.mobile.ui.base.showUndo
 import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
-import de.rogallab.mobile.ui.composables.showErrorMessage
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.ErrorState
 import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
 import kotlinx.coroutines.launch
 
@@ -64,7 +65,6 @@ fun WorkordersListScreen(
    val tag = "ok>WorkordersListScr  ."
 
    val workordersState: WorkorderUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
-   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
    BackHandler(
       enabled = true,
@@ -87,7 +87,6 @@ fun WorkordersListScreen(
             navigationIcon = {
                IconButton(
                   onClick = {
-                     logInfo(tag, "Lateral Navigation (Home)")
                      navController.navigate(route = NavScreen.PeopleList.route) {
                         popUpTo(route = NavScreen.PeopleList.route) { inclusive = true }
                      }
@@ -125,7 +124,7 @@ fun WorkordersListScreen(
          }
       }) { innerPadding ->
       if (workordersState.isLoading) {
-         logDebug(tag, "uiStatePeople.Loading")
+         logVerbose(tag, "workorderState Loading")
          Column(
             modifier = Modifier
                .padding(bottom = innerPadding.calculateBottomPadding())
@@ -152,29 +151,25 @@ fun WorkordersListScreen(
                val dismissState = rememberDismissState(
                   confirmValueChange = {
                      if (it == DismissValue.DismissedToEnd) {
-                        logDebug("ok>SwipeToDismiss", "-> Detail ${workorder.id}")
                         navController.navigate(NavScreen.WorkorderDetail.route + "/${workorder.id}")
-                        return@rememberDismissState true
+                        true
                      } else if (it == DismissValue.DismissedToStart) {
-                        logDebug("==>SwipeToDismiss().", "-> Delete")
                         viewModel.remove(workorder.id)
-                        val job = coroutineScope.launch {
-                           showErrorMessage(
-                              snackbarHostState = snackbarHostState,
-                              errorMessage = "Wollen die Arbeitsaufgabe wirklich löschen?",
-                              actionLabel = "nein",
-                              onErrorAction = {
-                                 viewModel.add(workorder)
-                              }
-                           )
-                        }
+                        // undo delete
+                        val job = showUndo(
+                           coroutineScope = coroutineScope,
+                           snackbarHostState = snackbarHostState,
+                           message = "Wollen Sie den Arbeitsauftrag wirklich löschen?",
+                           t = workorder,
+                           onUndoAction = viewModel::add
+                        )
                         coroutineScope.launch {
                            job.join()
                            navController.navigate(NavScreen.WorkordersList.route)
                         }
-                        return@rememberDismissState true
+                        true
                      }
-                     return@rememberDismissState false
+                     false
                   }
                )
 
@@ -201,31 +196,14 @@ fun WorkordersListScreen(
       } // state successful
    } // Scaffold
 
-   EventEffect(
-      event = errorState.errorEvent,
-      onHandled = viewModel::onErrorEventHandled
-   ) { it: String ->
-      val job = coroutineScope.launch {
-         snackbarHostState.showSnackbar(
-            message = it,
-            actionLabel = "ok",
-            withDismissAction = false,
-            duration = SnackbarDuration.Short
+   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+      LaunchedEffect(params) {
+         showAndRespondToError(
+            errorParams = params,
+            snackbarHostState = snackbarHostState,
+            navController = navController,
+            onErrorEventHandled = viewModel::onErrorEventHandled
          )
-      } // show snackbar
-      coroutineScope.launch {
-         // wait for snackbar to disappear
-         job.join()
-         // error event handled
-         viewModel.onErrorEventHandled()
-         // navigate back
-         if (errorState.back) {
-            logInfo(tag, "Back Navigation (Abort)")
-            navController.popBackStack(
-               route = NavScreen.PeopleList.route,
-               inclusive = false
-            )
-         }
-      } // navigate
+      }
    }
 }

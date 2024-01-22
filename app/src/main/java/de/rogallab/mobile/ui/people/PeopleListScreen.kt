@@ -26,11 +26,13 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismiss
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,15 +46,16 @@ import androidx.navigation.NavController
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.utilities.logDebug
-import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
-import de.rogallab.mobile.ui.composables.EventEffect
+import de.rogallab.mobile.ui.base.ErrorParams
+import de.rogallab.mobile.ui.base.showAndRespondToError
+import de.rogallab.mobile.ui.base.showUndo
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
-import de.rogallab.mobile.ui.composables.showErrorMessage
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,11 +74,9 @@ fun PeopleListScreen(
 //   )
 
    val peopleState: PeopleUiState by viewModel.stateFlowPeople.collectAsStateWithLifecycle()
-   val errorState: ErrorState by viewModel.stateFlowError.collectAsStateWithLifecycle()
 
-   val snackbarHostState = remember { SnackbarHostState() }
    val coroutineScope = rememberCoroutineScope()
-
+   val snackbarHostState = remember { SnackbarHostState() }
    Scaffold(
       topBar = {
          TopAppBar(
@@ -120,7 +121,7 @@ fun PeopleListScreen(
    }) { innerPadding ->
       // nothing to do
       if (peopleState.isLoading) {
-         logDebug(tag, "peopleState Loading")
+         logVerbose(tag, "peopleState Loading")
          Column(
             modifier = Modifier
                .padding(bottom = innerPadding.calculateBottomPadding())
@@ -138,45 +139,45 @@ fun PeopleListScreen(
 
          LazyColumn(
             modifier = Modifier
-               .padding(top = innerPadding.calculateTopPadding())
-               .padding(bottom = innerPadding.calculateBottomPadding())
+               .padding(paddingValues = innerPadding)
                .padding(horizontal = 8.dp),
             state = rememberLazyListState()
          ) {
             items(items = items) { person ->
+
                val dismissState = rememberDismissState(
-                  confirmValueChange = {
-                     if (it == DismissValue.DismissedToEnd) {
-                        logDebug("==>SwipeToDismiss().", "-> Edit")
-                        navController.navigate(NavScreen.PersonDetail.route + "/${person.id}")
-                        return@rememberDismissState true
-                     } else if (it == DismissValue.DismissedToStart) {
-                        logDebug("==>SwipeToDismiss().", "-> Delete")
-                        viewModel.remove(person.id)
-                        val job = coroutineScope.launch {
-                           showErrorMessage(
+                  confirmValueChange = { dismissValue: DismissValue ->
+                     when (dismissValue) {
+                        DismissValue.DismissedToEnd -> {
+                           navController.navigate(NavScreen.PersonDetail.route + "/${person.id}")
+                           true
+                        }
+                        DismissValue.DismissedToStart -> {
+                           viewModel.remove(person.id)
+                           // undo delete
+                           val job = showUndo(
+                              coroutineScope = coroutineScope,
                               snackbarHostState = snackbarHostState,
-                              errorMessage = "Wollen Sie die Person wirklich löschen?",
-                              actionLabel = "nein",
-                              onErrorAction = { viewModel.add(person) }
+                              message = "Wollen Sie die Person wirklich löschen?",
+                              t = person,
+                              onUndoAction = viewModel::add
                            )
+                           coroutineScope.launch {
+                              job.join()
+                              navController.navigate(NavScreen.PeopleList.route)
+                           }
+                           true
                         }
-                        coroutineScope.launch {
-                           job.join()
-                           navController.navigate(NavScreen.PeopleList.route)
-                        }
-                        return@rememberDismissState true
-                     }
-                     return@rememberDismissState false
-                  }
-               )
+                        else -> false
+                     } // when
+                  } // confirmValueChange
+               ) // rememberDismissState
+
                SwipeToDismiss(
                   state = dismissState,
                   modifier = Modifier.padding(vertical = 4.dp),
                   directions = setOf(DismissDirection.StartToEnd, DismissDirection.EndToStart),
-                  background = {
-                     SetSwipeBackgroud(dismissState)
-                  },
+                  background = { SetSwipeBackgroud(dismissState) },
                   dismissContent = {
                      Column(modifier = Modifier.clickable {
                         navController.navigate(NavScreen.PersonWorkorderOverview.route + "/${person.id}")
@@ -197,31 +198,14 @@ fun PeopleListScreen(
       } // state success
    } // Scaffold
 
-   EventEffect(
-      event = errorState.errorEvent,
-      onHandled = viewModel::onErrorEventHandled
-   ){ it: String ->
-      val job = coroutineScope.launch {
-         snackbarHostState.showSnackbar(
-            message = it,
-            actionLabel = "ok",
-            withDismissAction = false,
-            duration = SnackbarDuration.Short
+   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+      LaunchedEffect(params) {
+         showAndRespondToError(
+            errorParams = params,
+            snackbarHostState = snackbarHostState,
+            navController = navController,
+            onErrorEventHandled = viewModel::onErrorEventHandled
          )
-      }
-      coroutineScope.launch {
-         // wait for snackbar to disappear
-         job.join()
-         // error event handled
-         viewModel.onErrorEventHandled()
-         // navigate back
-         if (errorState.back) {
-            logInfo(tag, "Back Navigation (Abort)")
-            navController.popBackStack(
-               route = NavScreen.PeopleList.route,
-               inclusive = false
-            )
-         }
       }
    }
 }

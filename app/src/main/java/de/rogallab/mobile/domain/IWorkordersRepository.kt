@@ -23,4 +23,7 @@ interface IWorkordersRepository {
    fun getAll(): Flow<ResultData<List<Workorder>>>
    suspend fun getById(id: UUID): ResultData<Workorder?>
    suspend fun post(workorder: Workorder): ResultData<Unit>
+   suspend fun put(workorder: Workorder): ResultData<Unit>
+   suspend fun delete(workorder: Workorder): ResultData<Unit>
+
 }
