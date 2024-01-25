@@ -10,12 +10,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.rogallab.mobile.R
+import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IPeopleUseCases
 import de.rogallab.mobile.domain.ImagesRepository
 import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
+import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.ui.base.ErrorParams
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
@@ -48,7 +51,6 @@ class PeopleViewModel @Inject constructor(
 //   private val _savedStateHandle: SavedStateHandle,
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
-
 
    var dbChanged: Boolean = false
    var isWebservice: Boolean = true
@@ -177,45 +179,88 @@ class PeopleViewModel @Inject constructor(
 
    // State for PeopleList
    // private var _savedState: StateFlow<PeopleUiState> = _savedStateHandle.getStateFlow("peopleState", PeopleUiState())
+   private var _statePeopleLocal: PeopleUiState by mutableStateOf(PeopleUiState())
 
-
-   private var _statePeople: PeopleUiState by mutableStateOf(PeopleUiState())
-
-   val stateFlowPeople: StateFlow<PeopleUiState> = flow {
-      _useCases.fetchPeople(isWebservice).collect { result: ResultData<List<Person>> ->
+   // fetch data from local database
+   private val _stateFlowPeopleLocal: StateFlow<PeopleUiState> = flow {
+      logDebug(tag, "fetch from database" )
+      _useCases.selectPeople().collect { result: ResultData<List<Person>> ->
          when (result) {
             is ResultData.Loading -> {
-               _statePeople = _statePeople.loading()
-               emit(_statePeople)
+               _statePeopleLocal = _statePeopleLocal
+                  .copy(isLoading = true, isSuccessful = false)
+               emit(_statePeopleLocal)
             }
             is ResultData.Success -> {
-               _statePeople = _statePeople.success(result.data)
-               emit(_statePeople)
+               _statePeopleLocal = _statePeopleLocal
+                  .copy(isLoading = false, isSuccessful = true, people = result.data)
+               emit(_statePeopleLocal)
             }
             is ResultData.Failure -> showOnFailure(result.throwable)
          }
       }
-   }  .catch { throwable ->
-      showOnFailure(throwable)
-   }  .flowOn(_dispatcher)
+   }  .catch { showOnFailure(it) }.flowOn(_dispatcher)
       .stateIn(
          viewModelScope,
          SharingStarted.WhileSubscribed(1_000),
          PeopleUiState()
       )
 
+   // fetch data from webservice
+   private var _statePeopleRemote: PeopleUiState by mutableStateOf(PeopleUiState())
+   private var _stateFlowPeopleRemote = MutableStateFlow(PeopleUiState( ))
+
+   fun refreshFromWebservice() {
+      _coroutineScope.launch {
+         logDebug(tag, "refresh from webservice")
+         _useCases.getPeople().collect { result: ResultData<List<Person>> ->
+            when (result) {
+               is ResultData.Loading -> {
+                  _statePeopleRemote = _statePeopleRemote
+                     .copy(isLoading = true, isSuccessful = false)
+                  _stateFlowPeopleRemote.update { _statePeopleRemote }
+               }
+               is ResultData.Success -> {
+                  _statePeopleRemote = _statePeopleRemote
+                     .copy(isLoading = false, isSuccessful = true, people = result.data)
+                  _stateFlowPeopleRemote.update { _statePeopleRemote }
+               }
+               is ResultData.Failure -> showOnFailure(result.throwable)
+            }
+         }
+      }
+   }
+
+   // Combine both StateFlows
+   val stateFlowPeople: StateFlow<PeopleUiState> = combine(
+      _stateFlowPeopleLocal,
+      _stateFlowPeopleRemote
+   ) { stateFromLocal: PeopleUiState, stateFromRemote ->
+      // Here you decide how to combine both states.
+      // For instance, you might want to prioritize remote data over local data or vice versa.
+      // This is a simple example where we take whichever is not loading,
+      // but you can customize it based on your needs.
+      when {
+         stateFromRemote.isSuccessful  -> stateFromRemote
+         stateFromLocal.isSuccessful -> stateFromLocal
+         else -> PeopleUiState(isLoading = true) // or any other default state
+      }
+   }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(1_000),
+      PeopleUiState()
+   )
+
    fun readById(id: UUID) {
       _coroutineScope.launch {
+         logDebug(tag, "readById(${id.as8()}) isWebservice=$isWebservice")
+         // image is read by coil from webserver
          var result: ResultData<Person?>
          if(isWebservice) result = _repository.getById(id)
          else             result = _repository.findById(id)
-
          when (result) {
             is ResultData.Success -> {
-               result.data?.let { p: Person ->
-                  setStateFromPerson(p)
-                  dbChanged = false
-               }
+               result.data?.let { p: Person -> setStateFromPerson(p) }
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
@@ -226,30 +271,63 @@ class PeopleViewModel @Inject constructor(
    fun add(p: Person? = null) {
       val person = p ?: getPersonFromState()
       _coroutineScope.launch {
+         logDebug(tag, "add() imagePath=${person.imagePath} " +
+            "isWebservice=$isWebservice")
+         // upload image to server
+         if (isWebservice && person.imagePath != null) {
+            val resultImage = _imagesRepository.post(person.imagePath!!)
+            when (resultImage) {
+               is ResultData.Success -> {
+                  deleteFileOnInternalStorage(person.imagePath!!)
+                  person.imagePath = resultImage.data.remoteUriPath
+               }
+               is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
+               else -> Unit
+            }
+         }
+         // add person to database
          val result: ResultData<Unit>
          if (isWebservice) result = _repository.post(person)
          else              result = _repository.add(person)
          when (result) {
-            is ResultData.Success -> dbChanged = true
+            is ResultData.Success -> {
+               if(isWebservice) refreshFromWebservice()
+               else dbChanged = true
+            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
-         if(isWebservice) {
-            person.imagePath?.let{
-               _imagesRepository.upload(it)
-           }
-         }
+
       }
    }
 
    fun update(id: UUID) {
       val person = getPersonFromState(id)
       _coroutineScope.launch {
+         logDebug(tag, "update(${id.as8()} imagePath=${person.imagePath} " +
+            "isWebservice=$isWebservice")
+         // upload image to server
+         if (isWebservice && person.imagePath != null &&
+            ! person.imagePath!!.startsWith("http")) {
+            // we have a new local image to upload
+            val resultImage = _imagesRepository.post(person.imagePath!!)
+            when (resultImage) {
+               is ResultData.Success -> {
+                  deleteFileOnInternalStorage(person.imagePath!!)
+                  person.imagePath = resultImage.data.remoteUriPath
+               }
+               is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
+               else -> Unit
+            }
+         }
          var result: ResultData<Unit>
          if(isWebservice) result = _repository.put(person)
          else             result = _repository.update(person)
          when (result) {
-            is ResultData.Success -> dbChanged = true
+            is ResultData.Success -> {
+               if(isWebservice) refreshFromWebservice()
+               else dbChanged = true
+            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
@@ -259,11 +337,22 @@ class PeopleViewModel @Inject constructor(
    fun remove(id: UUID) {
       val person = getPersonFromState(id)
       _coroutineScope.launch {
+         logDebug(tag, "remove(${id.as8()})")
+         if (isWebservice && person.imagePath != null) {
+            val resultImage = _imagesRepository.delete(person.imagePath!!)
+            when (resultImage) {
+               is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
+               else -> Unit
+            }
+         }
          var result: ResultData<Unit>
          if(isWebservice) result = _repository.delete(person)
          else             result = _repository.remove(person)
          when (result) {
-            is ResultData.Success -> dbChanged = true
+            is ResultData.Success -> {
+               if(isWebservice) refreshFromWebservice()
+               else dbChanged = true
+            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
@@ -272,7 +361,12 @@ class PeopleViewModel @Inject constructor(
 
    fun readByIdWithWorkorders(id: UUID) {
       _coroutineScope.launch {
-         when (val result: ResultData<Person?> = _repository.findByIdWithWorkorders(id)) {
+         logDebug(tag, "readByIdWithWorkorders(${id.as8()}) isWebservice=$isWebservice")
+
+         var result: ResultData<Person?>
+         if(isWebservice) result = _repository.getByIdWithWorkorders(id)
+         else             result = _repository.findByIdWithWorkorders(id)
+         when (result) {
             is ResultData.Success -> {
                result.data?.let { person: Person ->
                   setStateFromPerson(person)
@@ -332,15 +426,27 @@ class PeopleViewModel @Inject constructor(
          viewModel.showOnError(message)
          return true
       }
-      viewModel.email?.let {
-         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches()) {
+      if (viewModel.firstName.length > 16) {
+         val message = ContextCompat.getString(context, R.string.errorFirstNameTooLong)
+         viewModel.showOnError(message)
+         return true
+      }
+      if (viewModel.lastName.length > 16) {
+         val message = ContextCompat.getString(context, R.string.errorLastNameTooLong)
+         viewModel.showOnError(message)
+         return true
+      }
+
+      if(! viewModel.email?.trim().isNullOrEmpty()) {
+         val charSeq: CharSequence  = viewModel.email!!.trim()
+         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(charSeq).matches()) {
             val message = ContextCompat.getString(context, R.string.errorEmail)
             viewModel.showAndNavigateBackOnFailure(message)
             return true
          }
       }
-      viewModel.phone?.let {
-         if (!android.util.Patterns.PHONE.matcher(it).matches()) {
+      if(! viewModel.phone.isNullOrEmpty()) {
+         if (!android.util.Patterns.PHONE.matcher(viewModel.phone).matches()) {
             val message = ContextCompat.getString(context, R.string.errorPhone)
             viewModel.showAndNavigateBackOnFailure(message)
             return true

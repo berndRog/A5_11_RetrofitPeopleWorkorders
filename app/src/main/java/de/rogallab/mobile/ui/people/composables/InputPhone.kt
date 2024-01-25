@@ -1,6 +1,5 @@
 package de.rogallab.mobile.ui.people.composables
 
-import android.content.Context
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
@@ -17,34 +16,34 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat.getString
 import de.rogallab.mobile.R
-import de.rogallab.mobile.domain.utilities.logDebug
-import de.rogallab.mobile.ui.people.PeopleViewModel
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun InputPhone(
    phone: String?,                           // State ↓
    onPhoneChange: (String) -> Unit,          // Event ↑
 ) {
 // val tag = "ok>InputNameMailPhone ."
-   val context = LocalContext.current
    val focusManager = LocalFocusManager.current
+   val keyboardController = LocalSoftwareKeyboardController.current
 
-   val textPhone = stringResource(R.string.phone)
-   val message = stringResource(R.string.errorPhone)
+   val label = stringResource(R.string.phone)
+   val errorMessage = stringResource(R.string.errorPhone)
 
    var isError by rememberSaveable { mutableStateOf(false) }
    var isFocus by rememberSaveable { mutableStateOf(false) }
    var errorText by rememberSaveable { mutableStateOf("") }
+
    OutlinedTextField(
       modifier = Modifier
          .padding(horizontal = 8.dp)
@@ -52,7 +51,7 @@ fun InputPhone(
          .onFocusChanged { focusState ->
             if (!focusState.isFocused && isFocus && validatePhone(phone)) {
                isError = true
-               errorText = message
+               errorText = errorMessage
             } else {
                isError = false
                errorText = ""
@@ -61,12 +60,12 @@ fun InputPhone(
          },
       value = phone ?: "",
       onValueChange = { onPhoneChange(it) }, // Event ↑
-      label = { Text(text = textPhone) },
+      label = { Text(text = label) },
       textStyle = MaterialTheme.typography.bodyLarge,
       leadingIcon = {
          Icon(
             imageVector = Icons.Outlined.Phone,
-            contentDescription = textPhone)
+            contentDescription = label)
       },
       singleLine = true,
       keyboardOptions = KeyboardOptions(
@@ -76,14 +75,17 @@ fun InputPhone(
       // check when keyboard action is clicked
       keyboardActions = KeyboardActions(
          onDone = {
+            keyboardController?.hide()
             if (validatePhone(phone)) {
                isError = true
-               errorText = message
+               errorText = errorMessage
             } else {
                isError = false
                errorText = ""
             }
-            if(!isError) focusManager.clearFocus() // close keyboard
+            if(!isError) {
+               focusManager.clearFocus()
+            } // close keyboard
          }
       ),
       isError = isError,

@@ -57,7 +57,6 @@ suspend fun <T, R> roomQuery(
 suspend fun <T, R> apiQueryRequestAsFlow(
    tag: String,
    dispatcher: CoroutineDispatcher,
-   exceptionHandler: CoroutineExceptionHandler,
    // toData is a function that converts the response.body():T to the return type R
    toData: (T) -> R,
    // api call is a function type that returns a Response<T>
@@ -77,17 +76,15 @@ suspend fun <T, R> apiQueryRequestAsFlow(
             val dataEntities: List<R> = dtos.map { dto: T -> toData(dto) }
             emit(ResultData.Success(data = dataEntities))
          } ?: run {
-            emit(ResultData.Failure(IOException("response is successful, " +
-               "but body() is null"), tag))
+            emit(ResultData.Failure(IOException("response.body() is null")))
          }
       } else {
-         emit(ResultData.Failure(java.io.IOException("response is not successful" +
-            " ${httpStatusMessage(response.code())}"), tag))
+         emit(ResultData.Failure(java.io.IOException("${httpStatusMessage(response.code())}")))
       }
    } catch (t: Throwable) {
       emit(ResultData.Failure(t))
    }
-}.flowOn(dispatcher+exceptionHandler)
+}.flowOn(dispatcher)
 
 // T = Dto
 // R = Entity
@@ -110,12 +107,10 @@ suspend fun <T, R> apiQueryRequest(
             val data = toData(dto)
             return ResultData.Success(data)
          } ?: run {
-            ResultData.Failure(IOException("response is successful, " +
-               "but body() is null"), tag)
+            ResultData.Failure(IOException("response.body() is null"))
          }
       } else {
-         ResultData.Failure(java.io.IOException("response is not successful" +
-            " ${httpStatusMessage(response.code())}"), tag)
+         ResultData.Failure(java.io.IOException("${httpStatusMessage(response.code())}"))
       }
    } catch (t: Throwable) {
        ResultData.Failure(t)
@@ -123,7 +118,6 @@ suspend fun <T, R> apiQueryRequest(
 }
 
 suspend fun <T, R> apiCommandRequest(
-   tag: String,
    data: T,
    toDto: (T) -> R,
    apiCommand: suspend (R) -> Response<Unit>
@@ -136,8 +130,7 @@ suspend fun <T, R> apiCommandRequest(
       if (response.isSuccessful) {
          return ResultData.Success(data = Unit)
       } else {
-         ResultData.Failure(java.io.IOException("response is not successful" +
-            " ${httpStatusMessage(response.code())}"), tag)
+         ResultData.Failure(java.io.IOException("${httpStatusMessage(response.code())}"))
       }
    } catch (t: Throwable) {
       return ResultData.Failure(t)

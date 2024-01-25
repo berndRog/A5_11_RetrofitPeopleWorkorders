@@ -17,10 +17,9 @@ sealed class ResultData<out T>(
    val value: Any?,
    protected val _tag: String = "ResultData"
 ) {
-   val isSuccess: Boolean = this is Success<*> && value != null
-   //val isError:   Boolean = this is Error && value != null
-   val isFailure: Boolean = this is Failure && value != null
    val isLoading: Boolean = this is Loading
+   val isSuccess: Boolean = this is Success<*> && value != null
+   val isFailure: Boolean = this is Failure && value != null
 
    fun getOrNull(): T? =
       when(this) {
@@ -40,15 +39,10 @@ sealed class ResultData<out T>(
             when (value) {
                is IOException -> "IO Exception: ${value.localizedMessage}"
                is HttpException -> "HTTP Exception: ${httpStatusMessage(value.code())}"
-//               is CancellationException -> {
-//                  "CancellationException: ${value.localizedMessage}"
-//
-//               }
                is Exception -> "Exception: ${value.localizedMessage}"
                else -> "Unknown error"
             }
          }
-     //    is Error -> message
          else -> null
       }
       return message
@@ -56,17 +50,5 @@ sealed class ResultData<out T>(
 
    data class  Loading       (val loading:Boolean     ): ResultData<Nothing>(null)
    data class  Success<out T>(val data: T             ): ResultData<T>(data)
-   //data class  Error         (val message: String,      val tag:String = "ok>ResultData         .")
-   //   : ResultData<Nothing>(message, tag)
-
-   data class  Failure(
-      val throwable: Throwable,
-      val tag:String = "ok>ResultData         ."
-   ) : ResultData<Nothing>(throwable,tag) {
-      init {
-         this.errorMessageOrNull()?.let{ logError(_tag, it) }
-      }
-   }
-
-   //data object Empty                                   : ResultData<Nothing>(null)   // Singleton
+   data class  Failure       (val throwable: Throwable): ResultData<Nothing>(throwable)
 }

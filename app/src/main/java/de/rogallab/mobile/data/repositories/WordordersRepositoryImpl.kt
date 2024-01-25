@@ -61,7 +61,7 @@ class WordordersRepositoryImpl @Inject constructor(
                return@withContext ResultData.Success(workorder)
             } ?: run {
                val message = "Workorder with given id not found"
-               return@withContext ResultData.Failure(Exception(message), tag)
+               return@withContext ResultData.Failure(Exception(message))
             }
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -159,19 +159,18 @@ class WordordersRepositoryImpl @Inject constructor(
                val workorders: List<Workorder> = workordersDto.map { workorderDto -> toWorkorder(workorderDto) }
                emit(ResultData.Success(workorders))
             } ?: run {
-               emit(ResultData.Failure(
-                  IOException("response is successful, but body() is null"), tag))
+               emit(ResultData.Failure(IOException("response.body() is null")))
             }
          } else {
             emit(ResultData.Failure(
-               IOException("response is not successful ${httpStatusMessage(response.code())}"), tag))
+               IOException("response is not successful ${httpStatusMessage(response.code())}")))
          }
       }  catch(t: Throwable) {
-         emit(ResultData.Failure(t, tag))
+         emit(ResultData.Failure(t))
       }
    }  .catch { t: Throwable ->
-      emit(ResultData.Failure(t, tag))
-   }  .flowOn(_dispatcher + _exceptionHandler)
+      emit(ResultData.Failure(t))
+   }  .flowOn(_dispatcher)
 
    override suspend fun getById(id: UUID): ResultData<Workorder> =
       withContext(_dispatcher) {
@@ -184,15 +183,13 @@ class WordordersRepositoryImpl @Inject constructor(
                   val workorder: Workorder = toWorkorder(workorderDto)
                   return@withContext ResultData.Success(workorder)
                } ?: run {
-                  return@withContext ResultData.Failure(
-                     IOException("response is successful, but body() is null"), tag)
+                  return@withContext ResultData.Failure(IOException("response.body() is null"))
                }
             } else {
-               return@withContext ResultData.Failure(IOException("response is not successful" +
-                  " ${httpStatusMessage(response.code())}"), tag)
+               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
             }
          } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -205,12 +202,11 @@ class WordordersRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
-               return@withContext ResultData.Failure(IOException("response is not successful " +
-                  "${httpStatusMessage(response.code())}"), tag)
+               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
             }
          }
          catch (t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 

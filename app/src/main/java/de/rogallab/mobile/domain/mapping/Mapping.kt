@@ -1,10 +1,12 @@
 package de.rogallab.mobile.domain.mapping
 
 import de.rogallab.mobile.data.models.AddressDto
+import de.rogallab.mobile.data.models.ImageDto
 import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.data.models.PersonDtoWithWorkorderDtos
 import de.rogallab.mobile.data.models.WorkorderDto
 import de.rogallab.mobile.domain.entities.Address
+import de.rogallab.mobile.domain.entities.Image
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.toZonedDateTime
@@ -22,6 +24,19 @@ fun toAddressDto(address: Address): AddressDto = AddressDto(
    number = address.number,
    postal = address.postal,
    city = address.city
+)
+
+fun toImage(imageDto: ImageDto): Image = Image(
+   contentType = imageDto.contentType,
+   remoteUriPath = imageDto.remoteUriPath,
+   userId = imageDto.userId,
+   id = imageDto.id
+)
+fun toImageDto(image: Image): ImageDto = ImageDto(
+   contentType = image.contentType,
+   remoteUriPath = image.remoteUriPath,
+   userId = image.userId,
+   id = image.id
 )
 
 fun toPerson(personDto:PersonDto): Person = Person(
@@ -53,7 +68,7 @@ fun toWorkorder(workorderDto:WorkorderDto): Workorder = Workorder(
    started = toZonedDateTime(workorderDto.started),
    completed = toZonedDateTime(workorderDto.completed),
    state = workorderDto.state,
-   duration = Duration.ofMillis(workorderDto.duration),
+   duration = Duration.ofNanos(workorderDto.duration), // convert duration into nanos
    remark = workorderDto.remark,
    id = workorderDto.id,
    person = null,
@@ -68,7 +83,7 @@ fun toWorkorderDto(workorder: Workorder): WorkorderDto = WorkorderDto(
    started = toZuluString(workorder.started),
    completed = toZuluString(workorder.completed),
    state = workorder.state,
-   duration = workorder.duration.toMillis(),
+   duration = workorder.duration.toNanos(),          // convert duration into nanos
    remark = workorder.remark,
    id = workorder.id,
    personId = workorder.personId,

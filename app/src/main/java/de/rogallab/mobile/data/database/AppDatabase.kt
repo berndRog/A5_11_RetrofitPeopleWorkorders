@@ -14,7 +14,7 @@ import de.rogallab.mobile.data.models.WorkorderDto
    version = AppStart.database_version,
    exportSchema = false
 )
-@TypeConverters(UUIDConverter::class, ZonedDateTimeConverters::class)
+@TypeConverters(ZonedDateTimeConverters::class, DurationConverters::class, UUIDConverter::class)
 abstract class AppDatabase : RoomDatabase() {
    // The database exposes DAOs through an abstract "getter" method for each @Dao.
    abstract fun createPeopleDao(): IPeopleDao

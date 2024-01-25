@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.appcompat.app.AppCompatActivity
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
@@ -52,6 +53,9 @@ class Seed @Inject constructor(
    var workorder06: Workorder = Workorder()
 
    init {
+
+
+
       imagesUri = initializeImages()
       people = initializePeople(imagesUri)
       workorders = initializeWorkorders()

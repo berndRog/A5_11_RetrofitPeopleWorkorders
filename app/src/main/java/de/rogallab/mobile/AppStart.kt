@@ -22,9 +22,9 @@ class AppStart : Application() {
       const val isVerbose = true
       const val database_name:    String = "Workmanager.db"
       const val database_version: Int    = 1
-//    const val base_url: String = "http://10.0.2.2:5010/workmanagerapi/v1/"
-      const val base_url: String = "http://192.168.178.23:5010/workmanagerapi/v1/"
-      const val api_key:  String = "a904cda52f054306a6cc9a3494b36aad"
+//    const val base_url: String = "http://10.0.2.2:5010/"
+      const val base_url: String = "http://192.168.178.23:5010/"
+      const val api_key:  String = ""
       const val bearer_token:  String = ""
 
    }

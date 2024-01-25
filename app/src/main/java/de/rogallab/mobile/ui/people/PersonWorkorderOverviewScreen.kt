@@ -45,8 +45,6 @@ import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
-import de.rogallab.mobile.domain.utilities.logInfo
-import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
@@ -70,14 +68,19 @@ fun PersonWorkorderOverviewScreen(
    if(id == null) {
       peopleViewModel.showAndNavigateBackOnFailure("No id for person is given")
    }
-   val personId: UUID by rememberSaveable { mutableStateOf(id!!)  }
 
-   LaunchedEffect(Unit) {
+   val personId: UUID by rememberSaveable { mutableStateOf(id!!)  }
+   val toggleRead = remember { mutableStateOf(true) }
+
+   LaunchedEffect(toggleRead.value) {
       logDebug(tag, "ReadById(${personId.as8()})")
       peopleViewModel.readByIdWithWorkorders(personId)
    }
 
    val workorderState: WorkorderUiState by workordersViewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
+   LaunchedEffect(Unit) {
+      workordersViewModel.refreshFromWebservice() // Ensuring refresh is called at least once
+   }
 
    BackHandler(
       enabled = true,
@@ -127,7 +130,7 @@ fun PersonWorkorderOverviewScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
          ) {
-            CircularProgressIndicator(modifier = Modifier.size(160.dp))
+            CircularProgressIndicator(modifier = Modifier.size(100.dp))
          }
       } else if (workorderState.isSuccessful && workorderState.workorders.isNotEmpty()) {
 
@@ -137,7 +140,8 @@ fun PersonWorkorderOverviewScreen(
 
          val assignedWorkorders = workorderState.workorders
             .filter { it: Workorder -> it.personId == personId }
-         
+
+
          Column(
             modifier = Modifier
                .padding(top = innerPadding.calculateTopPadding(),
@@ -232,7 +236,7 @@ private fun AssignedWorkorders(
    onUnAssignWorkorder: (Workorder) -> Unit
 ) {
            //12345678901234567890123
-   val tag ="ok>AssignedWorkorders ."
+   //val tag ="ok>AssignedWorkorders ."
 
    if (assignedWorkorders.size > 0) {
       Text(
@@ -260,11 +264,11 @@ private fun AssignedWorkorders(
                         // update the workorder in the database
                         onUnAssignWorkorder(workorder)
                         navController.navigate(NavScreen.PersonWorkorderOverview.route + "/$personId")
-                        true
+                        return@rememberDismissState true
                      }
-                     false
+                     return@rememberDismissState false
                   }
-                  else false
+                  else return@rememberDismissState false
                }
             )
             SwipeToDismiss(

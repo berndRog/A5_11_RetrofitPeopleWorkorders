@@ -58,7 +58,7 @@ fun httpStatusMessage(code:Int) : String {
             508 -> httpMessage += "Loop Detected"
             510 -> httpMessage += "Not Extended"
             511 -> httpMessage += "Network Authentication Required"
-            else -> "Error HTTP Status Code unknown ${code}"
+            else -> httpMessage +="unknown ${code}"
       }
       return httpMessage
 }

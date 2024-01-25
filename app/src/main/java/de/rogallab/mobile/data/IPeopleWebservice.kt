@@ -1,6 +1,7 @@
 package de.rogallab.mobile.data
 
 import de.rogallab.mobile.data.models.PersonDto
+import de.rogallab.mobile.data.models.WorkorderDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -11,27 +12,33 @@ import retrofit2.http.Path
 import java.util.UUID
 
 interface IPeopleWebservice {
-   @GET("people")
+   @GET("workmanagerapi/v1/people")
    suspend fun getAll(
    ): Response<List<PersonDto>>
 
-   @GET("people/{id}")
+   @GET("workmanagerapi/v1/people/{id}")
    suspend fun getById(
       @Path("id") id: UUID
    ): Response<PersonDto?>
 
-   @POST("people")
+   // get the workorders for a person with the given id
+   @GET("workmanagerapi/v1/people/{personId}/workorders")
+   suspend fun getByIdWithWorkorders(
+      @Path("personId") personId: UUID
+   ): Response<List<WorkorderDto>>
+
+   @POST("workmanagerapi/v1/people")
    suspend fun post(
       @Body personDto: PersonDto
    ): Response<Unit>
 
-   @PUT("people/{id")
+   @PUT("workmanagerapi/v1/people/{id}")
    suspend fun put(
       @Path("id") id:UUID,
       @Body personDto: PersonDto
    ): Response<Unit>
 
-   @DELETE("people/{id}")
+   @DELETE("workmanagerapi/v1/people/{id}")
    suspend fun delete(
       @Path("id") id: UUID
    ): Response<Unit>

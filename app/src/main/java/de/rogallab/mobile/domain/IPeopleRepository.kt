@@ -25,5 +25,6 @@ interface IPeopleRepository {
    suspend fun put(person: Person): ResultData<Unit>
    suspend fun delete(person: Person): ResultData<Unit>
 
+   suspend fun getByIdWithWorkorders(id: UUID): ResultData<Person?>
 }
 

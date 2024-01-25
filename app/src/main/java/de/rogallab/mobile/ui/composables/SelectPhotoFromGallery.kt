@@ -32,7 +32,7 @@ fun SelectPhotoFromGallery(
    onImagePathChanged: (String?) -> Unit,  // Event ↑
 ) {
    val tag = "ok>SelectPhotoFromGale."
-   logDebug(tag,"Start")
+   //logVerbose(tag,"Start")
 
    var bitmap:Bitmap?
    val context = LocalContext.current
@@ -44,11 +44,13 @@ fun SelectPhotoFromGallery(
       // get bitmap from content resolver (photo gallery)
       uri?.let {
          bitmap = if (Build.VERSION.SDK_INT < 28) {
-            getBitmap(context.contentResolver, it)
+            null
          } else {
-            val source = ImageDecoder.createSource(context.contentResolver, it)
-            ImageDecoder.decodeBitmap(source)
+            ImageDecoder.createSource(context.contentResolver, it).run {
+               ImageDecoder.decodeBitmap(this)
+            }
          }
+
          // save bitmap to internal storage of the app
          bitmap?.let { bitmap ->
             writeImageToInternalStorage(context, bitmap)?.let { uriPath:String? ->

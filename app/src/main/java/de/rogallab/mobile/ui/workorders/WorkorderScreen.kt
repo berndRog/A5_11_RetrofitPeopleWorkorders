@@ -55,12 +55,16 @@ fun WorkorderScreen(
    viewModel: WorkordersViewModel,
 ) {
           // 12345678901234567890123
-   val tag = "ok>WorkorderInputScr  ."
+   var tag = "ok>WorkorderInputScr  ."
    val isInput:Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
 
 
+
+
+
+
    if (! isInput) {
-      val tag = "ok>WorkorderDetailScr ."
+      tag = "ok>WorkorderDetailScr ."
       id?.let {
          LaunchedEffect(Unit) {
             logDebug(tag, "ReadById()")

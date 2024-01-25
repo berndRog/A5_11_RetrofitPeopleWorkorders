@@ -11,28 +11,30 @@ import retrofit2.http.Path
 import java.util.UUID
 
 interface IWorkordersWebservice {
-   @GET("worksorders")
+
+   @GET("workmanagerapi/v1/workorders")
    suspend fun getAll(
    ): Response<List<WorkorderDto>>
 
-   @GET("worksorders/{id}")
+   @GET("workmanagerapi/v1/workorders/{id}")
    suspend fun getById(
       @Path("id") id: UUID
    ): Response<WorkorderDto?>
 
-   @POST("worksorders")
+   @POST("workmanagerapi/v1/workorders")
    suspend fun post(
       @Body workorderDto: WorkorderDto
    ): Response<Unit>
 
-   @PUT("worksorders/{id")
+   @PUT("workmanagerapi/v1/workorders/{id}")
    suspend fun put(
       @Path("id") id:UUID,
       @Body workorderDto: WorkorderDto
    ): Response<Unit>
 
-   @DELETE("worksorders/{id}")
+   @DELETE("workmanagerapi/v1/workorders/{id}")
    suspend fun delete(
       @Path("id") id: UUID
    ): Response<Unit>
+
 }

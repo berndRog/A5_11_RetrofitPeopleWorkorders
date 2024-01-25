@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.rogallab.mobile.domain.IWorkorderUseCases
 import de.rogallab.mobile.domain.IWorkordersRepository
@@ -13,24 +12,29 @@ import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.entities.Workorder
+import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.ErrorState
 import de.rogallab.mobile.ui.navigation.NavScreen
+import de.rogallab.mobile.ui.people.PeopleUiState
+import de.rogallab.mobile.ui.people.PeopleViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -46,7 +50,7 @@ class WorkordersViewModel @Inject constructor(
 
    var dbChanged: Boolean = false
 
-   var isWebservice: Boolean = false
+   var isWebservice: Boolean = true
 
    private var _id: UUID = UUID.randomUUID()
    val id
@@ -123,12 +127,7 @@ class WorkordersViewModel @Inject constructor(
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
       exception.localizedMessage?.let { message ->
          logError(tag, message)
-
-
         // _stateFlowError.update{ it.copy(message = message, isNavigation = false) }
-
-
-
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -184,7 +183,6 @@ class WorkordersViewModel @Inject constructor(
          )
       )
    }
-
    fun onErrorEventHandled() {
       logDebug(tag, "onErrorEventHandled()")
       errorState = errorState.copy(errorParams = null)
@@ -196,34 +194,62 @@ class WorkordersViewModel @Inject constructor(
       // toDo
    }
 
+
+   // this works for room but not for a webservice
+//   val stateFlowWorkorders: StateFlow<WorkorderUiState> = flow {
+//      logDebug(tag,"stateFlowWorkorders() isWebservice=$isWebservice")
+//      _useCases.fetchWorkorders(isWebservice).collect { result: ResultData<List<Workorder>> ->
+//         when (result) {
+//            is ResultData.Loading -> {
+//               _stateWorkorders = _stateWorkorders.loading()
+//               emit(_stateWorkorders)
+//            }
+//            is ResultData.Success -> {
+//               _stateWorkorders = _stateWorkorders.success(result.data)
+//               emit(_stateWorkorders)
+//            }
+//            is ResultData.Failure -> showOnFailure(result.throwable)
+//         }
+//      }
+//   }  .catch { throwable ->
+//      showOnFailure(throwable)
+//   }  .flowOn(_dispatcher)
+//      .stateIn(
+//         viewModelScope,
+//         SharingStarted.WhileSubscribed(1_000),
+//         WorkorderUiState()
+//      )
+
+
    // StateFlow for List Screens
    private var _stateWorkorders: WorkorderUiState by mutableStateOf(WorkorderUiState())
-   val stateFlowWorkorders: StateFlow<WorkorderUiState> = flow {
-      _useCases.fetchWorkorders(isWebservice).collect { result: ResultData<List<Workorder>> ->
-         when (result) {
-            is ResultData.Loading -> {
-               _stateWorkorders = _stateWorkorders.loading()
-               emit(_stateWorkorders)
+   private var _stateFlowWorkordersPeople = MutableStateFlow(WorkorderUiState( ))
+   val stateFlowWorkorders: StateFlow<WorkorderUiState> = _stateFlowWorkordersPeople.asStateFlow()
+
+   fun refreshFromWebservice() {
+      _coroutineScope.launch {
+         logDebug(tag, "read()")
+         _useCases.getWorkorders().collect { result: ResultData<List<Workorder>> ->
+            when (result) {
+               is ResultData.Loading -> {
+                  _stateWorkorders = _stateWorkorders.copy(isLoading = true,
+                     isSuccessful = false, workorders = emptyList())
+                  _stateFlowWorkordersPeople.update { _stateWorkorders }
+               }
+               is ResultData.Success -> {
+                  _stateWorkorders = _stateWorkorders.copy(isLoading = true,
+                     isSuccessful = false, workorders = result.data)
+                  _stateFlowWorkordersPeople.update { _stateWorkorders }
+               }
+               is ResultData.Failure -> showOnFailure(result.throwable)
             }
-            is ResultData.Success -> {
-               _stateWorkorders = _stateWorkorders.success(result.data)
-               emit(_stateWorkorders)
-            }
-            is ResultData.Failure -> showOnFailure(result.throwable)
-            else -> Unit
          }
       }
-   }  .catch { throwable ->
-      showOnFailure(throwable)
-   }  .flowOn(_dispatcher)
-      .stateIn(
-         viewModelScope,
-         SharingStarted.WhileSubscribed(1_000),
-         WorkorderUiState()
-      )
+   }
 
    fun readById(id: UUID) {
       _coroutineScope.launch {
+         logDebug(tag,"readById(${id.as8()}) isWebservice=$isWebservice")
          var result: ResultData<Workorder?>
          if(isWebservice) result = _repository.getById(id)
          else             result = _repository.findById(id)
@@ -243,12 +269,16 @@ class WorkordersViewModel @Inject constructor(
    fun add(w: Workorder? = null) {
       val workorder = w ?: getWorkorderFromState()
       _coroutineScope.launch {
+         logDebug(tag,"add() isWebservice=$isWebservice")
          var result: ResultData<Unit>
          if(isWebservice) result = _repository.post(workorder)
          else             result = _repository.add(workorder)
          when (result) {
             is ResultData.Loading -> Unit
-            is ResultData.Success -> dbChanged = true
+            is ResultData.Success -> {
+               if(isWebservice) refreshFromWebservice()
+               else dbChanged = true
+            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
          }
       }
@@ -257,12 +287,16 @@ class WorkordersViewModel @Inject constructor(
    fun update(w: Workorder? = null) {
       val workorder = w ?: getWorkorderFromState()
       _coroutineScope.launch {
+         logDebug(tag,"update() isWebservice=$isWebservice")
          var result: ResultData<Unit>
          if(isWebservice) result = _repository.put(workorder)
          else             result = _repository.update(workorder)
          when (result) {
             is ResultData.Loading -> Unit
-            is ResultData.Success ->  dbChanged = true
+            is ResultData.Success -> {
+               if(isWebservice) refreshFromWebservice()
+               else dbChanged = true
+            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
          }
       }
@@ -271,8 +305,15 @@ class WorkordersViewModel @Inject constructor(
    fun remove(id: UUID) {
       val workorder = getWorkorderFromState(id)
       _coroutineScope.launch {
-         when (val result = _repository.remove(workorder)) {
-            is ResultData.Success -> dbChanged = true
+         logDebug(tag,"remove() isWebservice=$isWebservice")
+         var result: ResultData<Unit>
+         if(isWebservice) result = _repository.delete(workorder)
+         else             result = _repository.remove(workorder)
+         when (result) {
+            is ResultData.Success ->  {
+               if(isWebservice) refreshFromWebservice()
+               else dbChanged = true
+            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
@@ -281,6 +322,7 @@ class WorkordersViewModel @Inject constructor(
 
    fun readByIdWithPerson(id: UUID) {
       _coroutineScope.launch {
+         logDebug(tag,"readByIdWithPerson(${id.as8()}) isWebservice=$isWebservice")
          when (val result: ResultData<Map<Workorder, Person?>> =
             _repository.findByIdWithPerson(id)) {
             is ResultData.Success -> {

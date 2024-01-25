@@ -65,6 +65,9 @@ fun WorkordersListScreen(
    val tag = "ok>WorkordersListScr  ."
 
    val workordersState: WorkorderUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
+   LaunchedEffect(Unit) {
+      viewModel.refreshFromWebservice() // Ensuring refresh is called at least once
+   }
 
    BackHandler(
       enabled = true,
@@ -152,7 +155,7 @@ fun WorkordersListScreen(
                   confirmValueChange = {
                      if (it == DismissValue.DismissedToEnd) {
                         navController.navigate(NavScreen.WorkorderDetail.route + "/${workorder.id}")
-                        true
+                        return@rememberDismissState true
                      } else if (it == DismissValue.DismissedToStart) {
                         viewModel.remove(workorder.id)
                         // undo delete
@@ -167,9 +170,9 @@ fun WorkordersListScreen(
                            job.join()
                            navController.navigate(NavScreen.WorkordersList.route)
                         }
-                        true
+                        return@rememberDismissState true
                      }
-                     false
+                     return@rememberDismissState false
                   }
                )
 

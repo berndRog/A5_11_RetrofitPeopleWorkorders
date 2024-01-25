@@ -11,24 +11,16 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import javax.inject.Inject
 
-class FetchWorkorders @Inject constructor(
+class SelectWorkorders @Inject constructor(
    private val _repository: IWorkordersRepository,
    private val _dispatcher: CoroutineDispatcher
 ) {
-   operator fun invoke(isWebservice:Boolean): Flow<ResultData<List<Workorder>>> = flow {
+   operator fun invoke(): Flow<ResultData<List<Workorder>>> = flow {
       logDebug(tag, "invoke()")
       emit(ResultData.Loading(true))
-
-      if (isWebservice) {
-         // make the api call
-         _repository.getAll().collect { it: ResultData<List<Workorder>> ->
-            emit(it)
-         }
-      } else {
-         // read from local database
-         _repository.selectAll().collect { it: ResultData<List<Workorder>> ->
-            emit(it)
-         }
+      // read from local database
+      _repository.selectAll().collect { it: ResultData<List<Workorder>> ->
+         emit(it)
       }
    } .catch { e: Throwable ->
       emit(ResultData.Failure(e))

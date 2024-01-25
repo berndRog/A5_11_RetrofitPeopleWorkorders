@@ -12,6 +12,7 @@ data class PersonDto (
    var email: String? = null,
    var phone:String? = null,
    var imagePath: String? = null,
+   var remoteUriPath: String? = null,
    @PrimaryKey
    val id: UUID = UUID.randomUUID(),
    //@Embedded  // Workorder -> Adress [0..1]

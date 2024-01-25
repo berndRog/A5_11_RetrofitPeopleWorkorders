@@ -4,8 +4,10 @@ import androidx.room.TypeConverter
 import de.rogallab.mobile.domain.utilities.formatISO
 import de.rogallab.mobile.domain.utilities.systemZoneId
 import de.rogallab.mobile.domain.utilities.toZonedDateTimeUTC
+import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.UUID
+
 
 @ProvidedTypeConverter
 object ZonedDateTimeConverters {
@@ -16,6 +18,16 @@ object ZonedDateTimeConverters {
    @TypeConverter
    fun zonedDateTimeToString(zdt: ZonedDateTime): String =
       toZonedDateTimeUTC(zdt).format(formatISO)
+}
+
+@ProvidedTypeConverter
+object DurationConverters {
+   @TypeConverter
+   fun longToDuration(nanos: Long): Duration =
+      Duration.ofNanos(nanos)
+   @TypeConverter
+   fun durationToLong(duration: Duration): Long =
+      duration.toNanos()
 }
 
 @ProvidedTypeConverter

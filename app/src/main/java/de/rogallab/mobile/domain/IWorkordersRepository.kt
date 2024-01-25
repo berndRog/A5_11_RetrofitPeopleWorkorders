@@ -13,7 +13,7 @@ interface IWorkordersRepository {
    suspend fun count(): ResultData<Int>
 
    suspend fun add(workorder: Workorder): ResultData<Unit>
-   suspend fun addAll(workorder: List<Workorder>): ResultData<Unit>
+   suspend fun addAll(workorders: List<Workorder>): ResultData<Unit>
    suspend fun update(workorder: Workorder): ResultData<Unit>
    suspend fun remove(workorder: Workorder): ResultData<Unit>
 

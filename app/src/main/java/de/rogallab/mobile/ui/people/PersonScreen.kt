@@ -116,12 +116,14 @@ fun PersonScreen(
          InputName(
             name = viewModel.firstName,                  // State ↓
             onNameChange = viewModel::onFirstNameChange, // Event ↑
+            label = stringResource(R.string.firstName),
             errorTooShort = stringResource(R.string.errorFirstNameTooShort),
             errorTooLong = stringResource(R.string.errorFirstNameTooLong)
          )
          InputName(
             name = viewModel.lastName,                   // State ↓
             onNameChange = viewModel::onLastNameChange,  // Event ↑
+            label = stringResource(R.string.lastName),
             errorTooShort = stringResource(R.string.errorLastNameTooShort),
             errorTooLong = stringResource(R.string.errorLastNameTooLong)
          )
@@ -131,7 +133,7 @@ fun PersonScreen(
          )
          InputPhone(
             phone = viewModel.phone,                     // State ↓
-            onPhoneChange = viewModel::onPhoneChange     // Event ↑
+            onPhoneChange = viewModel::onPhoneChange,    // Event ↑
          )
          SelectAndShowImage(
             imagePath = viewModel.imagePath,                  // State ↓

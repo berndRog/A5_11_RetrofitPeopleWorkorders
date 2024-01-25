@@ -7,6 +7,7 @@ import de.rogallab.mobile.domain.utilities.maxValues
 import de.rogallab.mobile.domain.utilities.toZuluString
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import java.util.UUID
+import java.time.Duration
 
 @Entity(tableName = "workorders")
 data class WorkorderDto(

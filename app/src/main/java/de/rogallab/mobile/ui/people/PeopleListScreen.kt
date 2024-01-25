@@ -23,10 +23,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismiss
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -45,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
 import de.rogallab.mobile.domain.entities.Person
+import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.ui.base.ErrorParams
@@ -55,7 +54,6 @@ import de.rogallab.mobile.ui.composables.SetCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +72,9 @@ fun PeopleListScreen(
 //   )
 
    val peopleState: PeopleUiState by viewModel.stateFlowPeople.collectAsStateWithLifecycle()
+   LaunchedEffect(Unit) {
+      viewModel.refreshFromWebservice() // Ensuring refresh is called at least once
+   }
 
    val coroutineScope = rememberCoroutineScope()
    val snackbarHostState = remember { SnackbarHostState() }
@@ -85,7 +86,7 @@ fun PeopleListScreen(
                val activity = LocalContext.current as Activity
                IconButton(
                   onClick = {
-                     logDebug(tag, "Lateral Navigation: finish app")
+                     logDebug(tag, "Lateral Navigation -> Finish App")
                      activity.finish()
                   }) {
                   Icon(imageVector = Icons.Default.Menu,
@@ -102,7 +103,7 @@ fun PeopleListScreen(
             containerColor = MaterialTheme.colorScheme.tertiary,
             onClick = {
                // FAB clicked -> InputScreen initialized
-               logDebug(tag, "Forward Navigation: FAB clicked")
+               logDebug(tag, "FAB clicked --> PersonInput")
                viewModel.clearState()
                // Navigate to PersonDetail and put PeopleList on the back stack
                navController.navigate(route = NavScreen.PersonInput.route)
@@ -130,7 +131,7 @@ fun PeopleListScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
          ) {
-            CircularProgressIndicator(modifier = Modifier.size(160.dp))
+            CircularProgressIndicator(modifier = Modifier.size(100.dp))
          }
       } else if (peopleState.isSuccessful && peopleState.people.isNotEmpty()) {
          val items = peopleState.people
@@ -149,8 +150,9 @@ fun PeopleListScreen(
                   confirmValueChange = { dismissValue: DismissValue ->
                      when (dismissValue) {
                         DismissValue.DismissedToEnd -> {
+                           logDebug(tag, "PersonCard clicked -> PersonDetail")
                            navController.navigate(NavScreen.PersonDetail.route + "/${person.id}")
-                           true
+                           return@rememberDismissState true
                         }
                         DismissValue.DismissedToStart -> {
                            viewModel.remove(person.id)
@@ -164,11 +166,12 @@ fun PeopleListScreen(
                            )
                            coroutineScope.launch {
                               job.join()
+                              logDebug(tag, "Dismiss handled -> PersonList")
                               navController.navigate(NavScreen.PeopleList.route)
                            }
-                           true
+                           return@rememberDismissState true
                         }
-                        else -> false
+                        else -> return@rememberDismissState false
                      } // when
                   } // confirmValueChange
                ) // rememberDismissState
@@ -180,6 +183,7 @@ fun PeopleListScreen(
                   background = { SetSwipeBackgroud(dismissState) },
                   dismissContent = {
                      Column(modifier = Modifier.clickable {
+                        logDebug(tag, "PersonCard clicked -> PersonWorkorderOverview ${person.id.as8()}")
                         navController.navigate(NavScreen.PersonWorkorderOverview.route + "/${person.id}")
                      }) {
                         PersonCard(

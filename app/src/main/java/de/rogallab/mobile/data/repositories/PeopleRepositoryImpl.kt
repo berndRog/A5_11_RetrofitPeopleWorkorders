@@ -3,6 +3,7 @@ package de.rogallab.mobile.data.repositories
 import de.rogallab.mobile.data.IPeopleDao
 import de.rogallab.mobile.data.IPeopleWebservice
 import de.rogallab.mobile.data.models.PersonDto
+import de.rogallab.mobile.data.models.WorkorderDto
 import de.rogallab.mobile.data.network.httpStatusMessage
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.ResultData
@@ -59,7 +60,7 @@ class PeopleRepositoryImpl @Inject constructor(
                return@withContext ResultData.Success(person)
             } ?: run {
                val message = "Item with given id not found"
-               return@withContext ResultData.Failure(Exception(message), tag)
+               return@withContext ResultData.Failure(Exception(message))
             }
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -73,7 +74,7 @@ class PeopleRepositoryImpl @Inject constructor(
             logDebug(tag, "count() $records")
             return@withContext ResultData.Success(records)
          } catch (t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -86,7 +87,7 @@ class PeopleRepositoryImpl @Inject constructor(
             _dao.insert(personDto)
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -98,7 +99,7 @@ class PeopleRepositoryImpl @Inject constructor(
             _dao.insertAll(peopleDto)
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -111,7 +112,7 @@ class PeopleRepositoryImpl @Inject constructor(
             _dao.update(personDto)
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -123,7 +124,7 @@ class PeopleRepositoryImpl @Inject constructor(
             _dao.delete(personDto)
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -154,7 +155,7 @@ class PeopleRepositoryImpl @Inject constructor(
             return@withContext ResultData.Success(person)
          }
          catch (t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -164,24 +165,24 @@ class PeopleRepositoryImpl @Inject constructor(
          val response: Response<List<PersonDto>> = _webservice.getAll()
          logResponse(tag, response)
 
-         if (response.isSuccessful) {
-            response.body()?.let { peopleDto: List<PersonDto> ->
-               val people: List<Person> = peopleDto.map { personDto -> toPerson(personDto) }
-               emit(ResultData.Success(people))
-            } ?: run {
-               emit(ResultData.Failure(
-                  IOException("response is successful, but body() is null"), tag))
-            }
-         } else {
-            emit(ResultData.Failure(
-               IOException("response is not successful ${httpStatusMessage(response.code())}"), tag))
+         if (! response.isSuccessful) {
+            emit(ResultData.Failure(IOException("${httpStatusMessage(response.code())}")))
+            return@flow
          }
+
+         val people = response.body()?.map {
+            it: PersonDto -> toPerson(it)
+         }  ?: run {
+            emit(ResultData.Failure(IOException("response.body() is null")))
+            return@flow
+         }
+
+         emit(ResultData.Success(people))
+
       }  catch(t: Throwable) {
-         emit(ResultData.Failure(t, tag))
+         emit(ResultData.Failure(t))
       }
-   }  .catch { t: Throwable ->
-         emit(ResultData.Failure(t, tag))
-   }  .flowOn(_dispatcher + _exceptionHandler)
+   }.flowOn(_dispatcher).catch { t: Throwable -> emit(ResultData.Failure(t)) }
 
    override suspend fun getById(id: UUID): ResultData<Person> =
       withContext(_dispatcher) {
@@ -189,56 +190,49 @@ class PeopleRepositoryImpl @Inject constructor(
             val response = _webservice.getById(id)
             logResponse(tag, response)
 
-            if (response.isSuccessful) {
-               response.body()?.let { personDto ->
-                  val person: Person = toPerson(personDto)
-                  return@withContext ResultData.Success(person)
-               } ?: run {
-                  return@withContext ResultData.Failure(
-                     IOException("response is successful, but body() is null"), tag)
-               }
-            } else {
-               return@withContext ResultData.Failure(IOException("response is not successful" +
-                  " ${httpStatusMessage(response.code())}"), tag)
-            }
+            if (!response.isSuccessful)
+               return@withContext ResultData.Failure(
+                  IOException(" ${httpStatusMessage(response.code())}"))
+
+            response.body()?.let { personDto ->
+               val person: Person = toPerson(personDto)
+               return@withContext ResultData.Success(person)
+            } ?: return@withContext ResultData.Failure(IOException("response.body() is null"))
+
          } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
    override suspend fun post(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
-            val personDto = toPersonDto(person)
-            val response = _webservice.post(personDto)
+            val response = _webservice.post(toPersonDto(person))
             // logResponse(tag, response)
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
-               return@withContext ResultData.Failure(IOException("response is not successful " +
-                  "${httpStatusMessage(response.code())}"), tag)
+               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
             }
          }
          catch (t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
    override suspend fun put(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
-            val personDto = toPersonDto(person)
-            val response = _webservice.put(person.id, personDto)
+            val response = _webservice.put(person.id, toPersonDto(person))
             // logResponse(tag, response)
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
-               return@withContext ResultData.Failure(IOException("response is not successful " +
-                  "${httpStatusMessage(response.code())}"), tag)
+               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
             }
          }
          catch (t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
 
@@ -250,14 +244,46 @@ class PeopleRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
-               return@withContext ResultData.Failure(IOException("response is not successful " +
-                  "${httpStatusMessage(response.code())}"), tag)
+               return@withContext ResultData.Failure(
+                  IOException("${httpStatusMessage(response.code())}"))
             }
          }
          catch (t: Throwable) {
-            return@withContext ResultData.Failure(t, tag)
+            return@withContext ResultData.Failure(t)
          }
       }
+
+   override suspend fun getByIdWithWorkorders(id: UUID): ResultData<Person?> =
+      withContext(_dispatcher ) {
+         try {
+            // retrieve person
+            var responsePerson = _webservice.getById(id)
+            if (! responsePerson.isSuccessful) return@withContext ResultData.Failure(
+               IOException("${httpStatusMessage(responsePerson.code())}"))
+
+            val person = responsePerson.body()?.let { it: PersonDto ->  toPerson(it) }
+               ?: return@withContext ResultData.Failure(
+                  IOException("response is successful, but body() is null"))
+
+            // then retrieve workorders for this person and add them to the person
+            val responseWorkorders = _webservice.getByIdWithWorkorders(id)
+            if(!responseWorkorders.isSuccessful) return@withContext ResultData.Failure(
+               IOException("${httpStatusMessage(responseWorkorders.code())}"))
+
+            responseWorkorders.body()?.forEach { it: WorkorderDto ->
+               person.addWorkorder(toWorkorder(it))
+            } ?: return@withContext ResultData.Failure(IOException("response.body() is null"))
+
+            logDebug(tag, "getByIdWithWorkorders() " +
+               "${person.asString()} ${person.workorders?.size} workorders")
+            return@withContext ResultData.Success(person)
+         }
+         catch (t: Throwable) {
+            return@withContext ResultData.Failure(t)
+         }
+      }
+
+
 
    companion object {
       //12345678901234567890123

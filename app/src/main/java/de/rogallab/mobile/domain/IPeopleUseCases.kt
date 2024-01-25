@@ -1,7 +1,9 @@
 package de.rogallab.mobile.domain
 
-import de.rogallab.mobile.domain.usecases.people.FetchPeople
+import de.rogallab.mobile.domain.usecases.people.GetPeople
+import de.rogallab.mobile.domain.usecases.people.SelectPeople
 
 interface IPeopleUseCases {
-   val fetchPeople: FetchPeople
+   val selectPeople: SelectPeople
+   val getPeople: GetPeople
 }
