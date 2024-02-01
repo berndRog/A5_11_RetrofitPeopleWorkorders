@@ -1,5 +1,6 @@
 package de.rogallab.mobile.data
 
+import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.data.models.WorkorderDto
 import retrofit2.Response
 import retrofit2.http.Body
@@ -36,5 +37,10 @@ interface IWorkordersWebservice {
    suspend fun delete(
       @Path("id") id: UUID
    ): Response<Unit>
+
+   @GET("workmanagerapi/v1/workorders/{workorderId}/person")
+   suspend fun getByIdWithPerson(
+      @Path("workorderId") workorderId: UUID
+   ): Response<PersonDto?>
 
 }

@@ -37,10 +37,14 @@ class SeedDatabase @Inject constructor(
          if(countPeople == 0 && countWorkorders == 0) {
             _seed = Seed(_application)
             coroutineScope.async {
-               _peopleRepository.addAll(_seed!!.people)
+               _seed!!.people.forEach { person ->
+                  _peopleRepository.add(person)
+               }
             }.await()
             coroutineScope.async {
-               _workordersRepository.addAll(_seed!!.workorders)
+               _seed!!.workorders.forEach { workorder ->
+                  _workordersRepository.add(workorder)
+               }
             }.await()
          }
       }

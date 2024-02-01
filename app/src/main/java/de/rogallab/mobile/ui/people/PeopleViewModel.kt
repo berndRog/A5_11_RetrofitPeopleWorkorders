@@ -1,15 +1,12 @@
 package de.rogallab.mobile.ui.people
 
-import android.content.Context
-import androidx.compose.material3.SnackbarDuration
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IPeopleUseCases
@@ -17,11 +14,13 @@ import de.rogallab.mobile.domain.ImagesRepository
 import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
+import de.rogallab.mobile.domain.resources.PeopleErrorMessages
 import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.ErrorState
+import de.rogallab.mobile.ui.base.NavState
 import de.rogallab.mobile.ui.navigation.NavScreen
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -32,7 +31,6 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
@@ -48,68 +46,36 @@ class PeopleViewModel @Inject constructor(
    private val _useCases: IPeopleUseCases,
    private val _repository: IPeopleRepository,
    private val _imagesRepository: ImagesRepository,
+   val errorMessages: PeopleErrorMessages,
 //   private val _savedStateHandle: SavedStateHandle,
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
    var dbChanged: Boolean = false
-   var isWebservice: Boolean = true
+   var isWebservice: Boolean = false
+   
+   // Observer (DataBinding), Observable is a Person object
+   private val _personState: MutableState<Person> =  mutableStateOf(Person())
+   // access to the observable
+   val personStateValue: Person
+      get() = _personState.value  // Observable (DataBinding)
 
-   private var _id: UUID = UUID.randomUUID()
-   val id
-      get() = _id
-
-   fun onIdChange(value: UUID) {
-      if (value != _id) _id = value
-   }
-   // State = Observables (DataBinding)
-   private var _firstName: String by mutableStateOf("")
-   val firstName: String
-      get() = _firstName
-
-   fun onFirstNameChange(value: String) {
-      if (value != _firstName) _firstName = value
-   }
-
-   private var _lastName: String by mutableStateOf("")
-   val lastName: String
-      get() = _lastName
-
-   fun onLastNameChange(value: String) {
-      if (value != _lastName) _lastName = value
+   fun onPersonUiEventChange(event: PersonUiEvent, value: Any) {
+      _personState.value = when (event) {
+         PersonUiEvent.Id        -> personStateValue.copy(id        = value as UUID)
+         PersonUiEvent.FirstName -> personStateValue.copy(firstName = value as String)
+         PersonUiEvent.LastName  -> personStateValue.copy(lastName  = value as String)
+         PersonUiEvent.Email     -> personStateValue.copy(email     = value as String?)
+         PersonUiEvent.Phone     -> personStateValue.copy(phone     = value as String?)
+         PersonUiEvent.ImagePath -> personStateValue.copy(imagePath = value as String?)
+      }
    }
 
-   private var _email: String? by mutableStateOf(null)
-   val email: String?
-      get() = _email
-
-   fun onEmailChange(value: String) {
-      if (value != _email) _email = value
-   }
-   private var _phone: String? by mutableStateOf(null)
-   val phone: String?
-      get() = _phone
-   fun onPhoneChange(value: String) {
-      if (value != _phone) _phone = value
-   }
-
-   private var _imagePath: String? by mutableStateOf(null)
-   val imagePath: String?
-      get() = _imagePath
-   fun onImagePathChange(value: String?) {
-      if (value != _imagePath) _imagePath = value
-   }
-
-   private var _person: Person? by mutableStateOf(null)
-   val person: Person?
-      get() = _person
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
+      showOnFailure(exception)
       exception.localizedMessage?.let { message ->
          logError(tag, message)
-
-
-
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -127,23 +93,35 @@ class PeopleViewModel @Inject constructor(
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-
+   //
+   // Navigation State = ViewModel (one time) UI event
+   //
+   private var _navState: MutableState<NavState> =
+      mutableStateOf(NavState(onNavRequestHandled = ::onNavEventHandled))
+   val navState: NavState
+      get() = _navState.value
+   fun onNavEvent(route: String, clearBackStack: Boolean = true) {
+      _navState.value = navState.copy(route = route, clearBackStack = clearBackStack)
+   }
+   fun onNavEventHandled() {
+      _navState.value = navState.copy(route = null, clearBackStack = true )
+   }
+   //
    // Error State = ViewModel (one time) events
+   //
    // https://developer.android.com/topic/architecture/ui-layer/events#handle-viewmodel-events
-   var errorState by mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
-      private set
+   private val _errorState: MutableState<ErrorState> 
+      = mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
+   val errorState: ErrorState
+      get() = _errorState.value
 
    fun showOnFailure(throwable: Throwable) =
       showOnError(throwable.localizedMessage ?: "Unknown error")
    fun showOnError(errorMessage: String) {
       logError(tag, errorMessage)
-      errorState = errorState.copy(
+      _errorState.value = errorState.copy(
          errorParams = ErrorParams(
             message = errorMessage,
-            actionLabel = "ok",
-            duration = SnackbarDuration.Short,
-            withDismissAction = false,
-            onDismissAction = {},
             isNavigation = false
          ),
          onErrorHandled = ::onErrorEventHandled
@@ -154,22 +132,17 @@ class PeopleViewModel @Inject constructor(
       showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
    fun showAndNavigateBackOnFailure(errorMessage: String) {
       logError(tag, errorMessage)
-      errorState = errorState.copy(
+      _errorState.value = errorState.copy(
          errorParams = ErrorParams(
             message = errorMessage,
-            actionLabel = "ok",
-            duration = SnackbarDuration.Short,
-            withDismissAction = false,
-            onDismissAction = {},
             isNavigation = true,
             route = NavScreen.PeopleList.route
          )
       )
    }
-
    fun onErrorEventHandled() {
       logDebug(tag, "onErrorEventHandled()")
-      errorState = errorState.copy(errorParams = null)
+      _errorState.value = errorState.copy(errorParams = null)
    }
    // error handling
    fun onErrorAction() {
@@ -177,24 +150,25 @@ class PeopleViewModel @Inject constructor(
       // toDo
    }
 
-   // State for PeopleList
+   // State for PeopleList from local database
    // private var _savedState: StateFlow<PeopleUiState> = _savedStateHandle.getStateFlow("peopleState", PeopleUiState())
-   private var _statePeopleLocal: PeopleUiState by mutableStateOf(PeopleUiState())
+   private var _statePeopleValueDb: PeopleUiState by mutableStateOf(PeopleUiState())
+   private val _stateFlowPeopleDb: StateFlow<PeopleUiState> = fetchPeopleFromDatabase()
 
    // fetch data from local database
-   private val _stateFlowPeopleLocal: StateFlow<PeopleUiState> = flow {
-      logDebug(tag, "fetch from database" )
+   private fun fetchPeopleFromDatabase(): StateFlow<PeopleUiState> = flow {
+      logDebug(tag, "fetchPeoepleFromDatabase" )
       _useCases.selectPeople().collect { result: ResultData<List<Person>> ->
          when (result) {
             is ResultData.Loading -> {
-               _statePeopleLocal = _statePeopleLocal
+               _statePeopleValueDb = _statePeopleValueDb
                   .copy(isLoading = true, isSuccessful = false)
-               emit(_statePeopleLocal)
+               emit(_statePeopleValueDb)
             }
             is ResultData.Success -> {
-               _statePeopleLocal = _statePeopleLocal
+               _statePeopleValueDb = _statePeopleValueDb
                   .copy(isLoading = false, isSuccessful = true, people = result.data)
-               emit(_statePeopleLocal)
+               emit(_statePeopleValueDb)
             }
             is ResultData.Failure -> showOnFailure(result.throwable)
          }
@@ -205,44 +179,53 @@ class PeopleViewModel @Inject constructor(
          SharingStarted.WhileSubscribed(1_000),
          PeopleUiState()
       )
+   // refresh
+   fun refreshPeopleFromDatabase() {
+      _statePeopleValueDb = PeopleUiState() // Reset the state
+      fetchPeopleFromDatabase() // Re-invoke the flow
+   }
+   
+   // fetch data from remote webservice
+   private var _statePeopleValueWeb: PeopleUiState by mutableStateOf(PeopleUiState())
+   private var _stateFlowPeopleWeb = MutableStateFlow(PeopleUiState( ))
 
-   // fetch data from webservice
-   private var _statePeopleRemote: PeopleUiState by mutableStateOf(PeopleUiState())
-   private var _stateFlowPeopleRemote = MutableStateFlow(PeopleUiState( ))
-
-   fun refreshFromWebservice() {
+   private fun fetchPeopleFromWeb() {
+      if(!isWebservice) return
       _coroutineScope.launch {
          logDebug(tag, "refresh from webservice")
          _useCases.getPeople().collect { result: ResultData<List<Person>> ->
             when (result) {
                is ResultData.Loading -> {
-                  _statePeopleRemote = _statePeopleRemote
+                  _statePeopleValueWeb = _statePeopleValueWeb
                      .copy(isLoading = true, isSuccessful = false)
-                  _stateFlowPeopleRemote.update { _statePeopleRemote }
+                  _stateFlowPeopleWeb.update { _statePeopleValueWeb }
                }
                is ResultData.Success -> {
-                  _statePeopleRemote = _statePeopleRemote
+                  _statePeopleValueWeb = _statePeopleValueWeb
                      .copy(isLoading = false, isSuccessful = true, people = result.data)
-                  _stateFlowPeopleRemote.update { _statePeopleRemote }
+                  _stateFlowPeopleWeb.update { _statePeopleValueWeb }
                }
                is ResultData.Failure -> showOnFailure(result.throwable)
             }
          }
       }
    }
+   // refresh
+   fun refreshPeopleFromWeb() {
+      _statePeopleValueWeb = PeopleUiState() // Reset the state
+      fetchPeopleFromWeb()
+   }
 
-   // Combine both StateFlows
+   // Combine both StateFlows (i.e. caching strategy is needed for combining)
    val stateFlowPeople: StateFlow<PeopleUiState> = combine(
-      _stateFlowPeopleLocal,
-      _stateFlowPeopleRemote
-   ) { stateFromLocal: PeopleUiState, stateFromRemote ->
+      _stateFlowPeopleDb,
+      _stateFlowPeopleWeb
+   ) { stateFromDb: PeopleUiState, stateFromWeb: PeopleUiState ->
       // Here you decide how to combine both states.
       // For instance, you might want to prioritize remote data over local data or vice versa.
-      // This is a simple example where we take whichever is not loading,
-      // but you can customize it based on your needs.
       when {
-         stateFromRemote.isSuccessful  -> stateFromRemote
-         stateFromLocal.isSuccessful -> stateFromLocal
+         stateFromWeb.isSuccessful  -> stateFromWeb // remote data is prioritized
+         stateFromDb.isSuccessful -> stateFromDb
          else -> PeopleUiState(isLoading = true) // or any other default state
       }
    }.stateIn(
@@ -269,64 +252,71 @@ class PeopleViewModel @Inject constructor(
    }
 
    fun add(p: Person? = null) {
-      val person = p ?: getPersonFromState()
+      if(p != null) setStateFromPerson(p)
       _coroutineScope.launch {
-         logDebug(tag, "add() imagePath=${person.imagePath} " +
+         logDebug(tag, "add() imagePath=${personStateValue.imagePath} " +
             "isWebservice=$isWebservice")
          // upload image to server
-         if (isWebservice && person.imagePath != null) {
-            val resultImage = _imagesRepository.post(person.imagePath!!)
+         if (isWebservice && personStateValue.imagePath != null) {
+            val imagePath: String = personStateValue.imagePath!!
+            val resultImage = _imagesRepository.post(imagePath)
             when (resultImage) {
                is ResultData.Success -> {
-                  deleteFileOnInternalStorage(person.imagePath!!)
-                  person.imagePath = resultImage.data.remoteUriPath
+                  deleteFileOnInternalStorage(imagePath)
+                  _personState.value =
+                     personStateValue.copy(imagePath = resultImage.data.remoteUriPath)
                }
                is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
                else -> Unit
             }
          }
          // add person to database
+         val person = getPersonFromState()
          val result: ResultData<Unit>
          if (isWebservice) result = _repository.post(person)
          else              result = _repository.add(person)
          when (result) {
             is ResultData.Success -> {
-               if(isWebservice) refreshFromWebservice()
+               if(isWebservice) fetchPeopleFromWeb()
                else dbChanged = true
+               onNavEvent(route = NavScreen.PeopleList.route)
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
-
       }
    }
 
-   fun update(id: UUID) {
-      val person = getPersonFromState(id)
+   fun update() {
       _coroutineScope.launch {
-         logDebug(tag, "update(${id.as8()} imagePath=${person.imagePath} " +
-            "isWebservice=$isWebservice")
          // upload image to server
-         if (isWebservice && person.imagePath != null &&
-            ! person.imagePath!!.startsWith("http")) {
+         if (isWebservice && personStateValue.imagePath != null) {
+            val imagePath: String = personStateValue.imagePath!!
+            logDebug(tag, "update() imagePath=${imagePath} " +
+               "isWebservice=$isWebservice")
+            _personState.value = personStateValue.copy(imagePath = imagePath)
             // we have a new local image to upload
-            val resultImage = _imagesRepository.post(person.imagePath!!)
+            val resultImage = _imagesRepository.post(imagePath)
             when (resultImage) {
                is ResultData.Success -> {
-                  deleteFileOnInternalStorage(person.imagePath!!)
-                  person.imagePath = resultImage.data.remoteUriPath
+                  deleteFileOnInternalStorage(imagePath)
+                  _personState.value = personStateValue
+                     .copy(imagePath = resultImage.data.remoteUriPath)
                }
                is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
                else -> Unit
             }
          }
+         // update person in database
+         val person = getPersonFromState()
          var result: ResultData<Unit>
          if(isWebservice) result = _repository.put(person)
          else             result = _repository.update(person)
          when (result) {
             is ResultData.Success -> {
-               if(isWebservice) refreshFromWebservice()
+               if(isWebservice) fetchPeopleFromWeb()
                else dbChanged = true
+               onNavEvent(route = NavScreen.PeopleList.route)
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
@@ -335,22 +325,21 @@ class PeopleViewModel @Inject constructor(
    }
 
    fun remove(id: UUID) {
-      val person = getPersonFromState(id)
       _coroutineScope.launch {
          logDebug(tag, "remove(${id.as8()})")
-         if (isWebservice && person.imagePath != null) {
-            val resultImage = _imagesRepository.delete(person.imagePath!!)
-            when (resultImage) {
-               is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
-               else -> Unit
-            }
-         }
+         //if (isWebservice && person.imagePath != null) {
+            //val resultImage = _imagesRepository.delete(person.imagePath!!)
+            //when (resultImage) {
+            //   is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
+            //   else -> Unit
+            //}
+         //}
          var result: ResultData<Unit>
-         if(isWebservice) result = _repository.delete(person)
-         else             result = _repository.remove(person)
+         if(isWebservice) result = _repository.delete(id)
+         else             result = _repository.remove(id)
          when (result) {
             is ResultData.Success -> {
-               if(isWebservice) refreshFromWebservice()
+               if(isWebservice) fetchPeopleFromWeb()
                else dbChanged = true
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
@@ -370,8 +359,8 @@ class PeopleViewModel @Inject constructor(
             is ResultData.Success -> {
                result.data?.let { person: Person ->
                   setStateFromPerson(person)
-                  _person = person
                }
+               //onNavEvent(route = NavScreen.PeopleList.route)
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
@@ -380,79 +369,40 @@ class PeopleViewModel @Inject constructor(
    }
 
    fun assign(workorder: Workorder) {
-      _person?.addWorkorder(workorder)
+      personStateValue.addWorkorder(workorder)
    }
 
    fun unassign(workorder: Workorder) {
-      _person?.removeWorkorder(workorder)
-   }
-
-   private fun getPersonFromState(id: UUID? = null): Person =
-      id?.let {
-         return@let Person(_firstName, _lastName, _email, _phone, _imagePath, id)
-      } ?: run {
-         return@run Person(_firstName, _lastName, _email, _phone, _imagePath, _id)
-      }
-
-   private fun setStateFromPerson(person: Person) {
-      _firstName = person.firstName
-      _lastName = person.lastName
-      _email = person.email
-      _phone = person.phone
-      _imagePath = person.imagePath
-      _id = person.id
+      personStateValue.removeWorkorder(workorder)
    }
 
    fun clearState() {
       logDebug(tag, "clearState")
-      _firstName = ""
-      _lastName = ""
-      _email = null
-      _phone = null
-      _imagePath = null
-      _id = UUID.randomUUID()
+      _personState.value = Person()
+      onNavEvent(route = NavScreen.PersonInput.route, clearBackStack = false)
    }
 
+   private fun getPersonFromState(): Person =
+      Person(
+         firstName     = personStateValue.firstName,
+         lastName      = personStateValue.lastName,
+         email         = personStateValue.email,
+         phone         = personStateValue.phone,
+         imagePath     = personStateValue.imagePath,
+         id            = personStateValue.id,
+         imageId       = personStateValue.imageId,
+      )
 
-   fun isValid(context: Context, viewModel: PeopleViewModel): Boolean {
-
-      if (viewModel.firstName.isEmpty() || viewModel.firstName.length < 2) {
-         val message = ContextCompat.getString(context, R.string.errorFirstNameTooShort)
-         viewModel.showOnError(message)
-         return true
-      }
-      if (viewModel.lastName.isEmpty() || viewModel.lastName.length < 2) {
-         val message = ContextCompat.getString(context, R.string.errorLastNameTooShort)
-         viewModel.showOnError(message)
-         return true
-      }
-      if (viewModel.firstName.length > 16) {
-         val message = ContextCompat.getString(context, R.string.errorFirstNameTooLong)
-         viewModel.showOnError(message)
-         return true
-      }
-      if (viewModel.lastName.length > 16) {
-         val message = ContextCompat.getString(context, R.string.errorLastNameTooLong)
-         viewModel.showOnError(message)
-         return true
-      }
-
-      if(! viewModel.email?.trim().isNullOrEmpty()) {
-         val charSeq: CharSequence  = viewModel.email!!.trim()
-         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(charSeq).matches()) {
-            val message = ContextCompat.getString(context, R.string.errorEmail)
-            viewModel.showAndNavigateBackOnFailure(message)
-            return true
-         }
-      }
-      if(! viewModel.phone.isNullOrEmpty()) {
-         if (!android.util.Patterns.PHONE.matcher(viewModel.phone).matches()) {
-            val message = ContextCompat.getString(context, R.string.errorPhone)
-            viewModel.showAndNavigateBackOnFailure(message)
-            return true
-         }
-      }
-      return false
+   private fun setStateFromPerson(person: Person) {
+      _personState.value = personStateValue.copy(
+         firstName  = person.firstName,
+         lastName   = person.lastName,
+         email         = person.email,
+         phone         = person.phone,
+         imagePath     = person.imagePath,
+         id            = person.id,
+         imageId       = person.imageId,
+         )
    }
 
 

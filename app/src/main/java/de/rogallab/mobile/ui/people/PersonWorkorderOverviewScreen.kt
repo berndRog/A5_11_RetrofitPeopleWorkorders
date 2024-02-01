@@ -46,12 +46,12 @@ import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.ui.composables.PersonCard
-import de.rogallab.mobile.ui.composables.SetCardElevation
+import de.rogallab.mobile.ui.composables.setCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
-import de.rogallab.mobile.ui.workorders.WorkorderUiState
+import de.rogallab.mobile.ui.composables.evalWorkorderStateAndTime
+import de.rogallab.mobile.ui.workorders.WorkordersUiState
 import de.rogallab.mobile.ui.workorders.WorkordersViewModel
 import java.util.UUID
 
@@ -77,9 +77,9 @@ fun PersonWorkorderOverviewScreen(
       peopleViewModel.readByIdWithWorkorders(personId)
    }
 
-   val workorderState: WorkorderUiState by workordersViewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
+   val workorderState: WorkordersUiState by workordersViewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
    LaunchedEffect(Unit) {
-      workordersViewModel.refreshFromWebservice() // Ensuring refresh is called at least once
+      workordersViewModel.fetchWorkordersFromWeb() // Ensuring refresh is called at least once
    }
 
    BackHandler(
@@ -150,11 +150,11 @@ fun PersonWorkorderOverviewScreen(
                .fillMaxWidth()
          ) {
             PersonCard(
-               firstName = peopleViewModel.firstName,
-               lastName = peopleViewModel.lastName,
-               email = peopleViewModel.email,
-               phone = peopleViewModel.phone,
-               imagePath = peopleViewModel.imagePath
+               firstName = peopleViewModel.personStateValue.firstName,
+               lastName = peopleViewModel.personStateValue.lastName,
+               email = peopleViewModel.personStateValue.email,
+               phone = peopleViewModel.personStateValue.phone,
+               imagePath = peopleViewModel.personStateValue.imagePath
             )
 
             if(assignedWorkorders.size == 0) {
@@ -163,16 +163,17 @@ fun PersonWorkorderOverviewScreen(
                   text = "Keine Arbeitsaufgaben zugewiesen",
                   style = MaterialTheme.typography.titleMedium,
                )
+            } else {
+               AssignedWorkorders(
+                  navController = navController,
+                  personId = personId,
+                  assignedWorkorders = assignedWorkorders.toMutableList(),
+                  onUnAssignWorkorder = { workorder: Workorder ->
+                     peopleViewModel.unassign(workorder)
+                     workordersViewModel.update(workorder)
+                  }
+               )
             }
-            AssignedWorkorders(
-               navController = navController,
-               personId = personId,
-               assignedWorkorders = assignedWorkorders.toMutableList(),
-               onUnAssignWorkorder = { workorder: Workorder ->
-                  peopleViewModel.unassign(workorder)
-                  workordersViewModel.update(workorder)
-               }
-            )
 
             DefaultWorkordersList(
                workorders = defaultWorkorders.toMutableList(),
@@ -183,8 +184,6 @@ fun PersonWorkorderOverviewScreen(
             )
          }
       }
-
-
    }
 }
 
@@ -284,7 +283,7 @@ private fun AssignedWorkorders(
                         time = time,
                         state = state,
                         title = workorder.title,
-                        elevation = SetCardElevation(dismissState)
+                        elevation = setCardElevation(dismissState)
                      )
                   }
                }

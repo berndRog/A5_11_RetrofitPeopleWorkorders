@@ -26,8 +26,8 @@ fun PersonCard(
    email: String?,
    phone: String?,
    imagePath: String?,
-   elevation: CardElevation = CardDefaults.cardElevation(),
-   modifier: Modifier = Modifier
+   modifier: Modifier = Modifier,
+   elevation: CardElevation = CardDefaults.cardElevation()
 ) {
 
    Card(

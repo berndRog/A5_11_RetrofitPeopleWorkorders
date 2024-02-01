@@ -47,12 +47,12 @@ import de.rogallab.mobile.domain.utilities.logVerbose
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
 import de.rogallab.mobile.ui.base.showUndo
-import de.rogallab.mobile.ui.composables.SetCardElevation
+import de.rogallab.mobile.ui.composables.setCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
+import de.rogallab.mobile.ui.composables.evalWorkorderStateAndTime
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,9 +64,9 @@ fun WorkordersListScreen(
 ) {         //12345678901234567890123
    val tag = "ok>WorkordersListScr  ."
 
-   val workordersState: WorkorderUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
+   val workordersState: WorkordersUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
    LaunchedEffect(Unit) {
-      viewModel.refreshFromWebservice() // Ensuring refresh is called at least once
+      viewModel.fetchWorkordersFromWeb() // Ensuring refresh is called at least once
    }
 
    BackHandler(
@@ -112,7 +112,6 @@ fun WorkordersListScreen(
                // FAB clicked -> InputScreen initialized
                logDebug(tag, "Forward Navigation: FAB clicked")
                viewModel.clearState()
-               navController.navigate(route = NavScreen.WorkorderInput.route)
             }
          ) {
             Icon(Icons.Default.Add, "Add a workorder")
@@ -189,7 +188,7 @@ fun WorkordersListScreen(
                            time = time,
                            state = state,
                            title = workorder.title,
-                           elevation = SetCardElevation(dismissState)
+                           elevation = setCardElevation(dismissState)
                         )
                      }
                   }
@@ -199,7 +198,7 @@ fun WorkordersListScreen(
       } // state successful
    } // Scaffold
 
-   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+   viewModel.errorStateValue.errorParams?.let { params: ErrorParams ->
       LaunchedEffect(params) {
          showAndRespondToError(
             errorParams = params,

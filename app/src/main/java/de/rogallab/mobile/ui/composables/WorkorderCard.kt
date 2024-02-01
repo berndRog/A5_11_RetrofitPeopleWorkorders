@@ -19,8 +19,8 @@ fun WorkorderCard(
    time: String,
    state: String,
    title: String,
-   elevation: CardElevation = CardDefaults.cardElevation(),
-   modifier: Modifier = Modifier
+   modifier: Modifier = Modifier,
+   elevation: CardElevation = CardDefaults.cardElevation()
 ) {
 
    Card(

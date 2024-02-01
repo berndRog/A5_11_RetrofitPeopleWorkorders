@@ -103,7 +103,7 @@ data class SwipeProperties(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SetCardElevation(dismissState: DismissState) =
+fun setCardElevation(dismissState: DismissState) =
    CardDefaults.cardElevation(
       defaultElevation = 4.dp,
       pressedElevation = if (dismissState.dismissDirection != null) 8.dp else 4.dp,

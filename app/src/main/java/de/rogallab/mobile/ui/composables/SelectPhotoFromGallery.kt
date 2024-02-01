@@ -25,11 +25,12 @@ import androidx.compose.ui.unit.dp
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
 import de.rogallab.mobile.domain.utilities.logDebug
+import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logVerbose
 
 @Composable
 fun SelectPhotoFromGallery(
-   onImagePathChanged: (String?) -> Unit,  // Event ↑
+   onImagePathChanged: (String) -> Unit,  // Event ↑
 ) {
    val tag = "ok>SelectPhotoFromGale."
    //logVerbose(tag,"Start")
@@ -54,8 +55,11 @@ fun SelectPhotoFromGallery(
          // save bitmap to internal storage of the app
          bitmap?.let { bitmap ->
             writeImageToInternalStorage(context, bitmap)?.let { uriPath:String? ->
-               logVerbose(tag, "Storage $uriPath")
-               onImagePathChanged(uriPath)  // Event ↑
+               uriPath?.let { it: String ->
+                  logVerbose(tag, "Storage $it")
+                  onImagePathChanged(it)  // Event ↑
+                  logDebug(tag, "Storage $uriPath")
+               } ?: logError(tag, "Storage failed")
             }
          }
       }

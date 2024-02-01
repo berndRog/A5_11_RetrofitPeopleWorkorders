@@ -50,7 +50,7 @@ import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
 import de.rogallab.mobile.ui.base.showUndo
 import de.rogallab.mobile.ui.composables.PersonCard
-import de.rogallab.mobile.ui.composables.SetCardElevation
+import de.rogallab.mobile.ui.composables.setCardElevation
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.navigation.AppNavigationBar
 import de.rogallab.mobile.ui.navigation.NavScreen
@@ -73,7 +73,7 @@ fun PeopleListScreen(
 
    val peopleState: PeopleUiState by viewModel.stateFlowPeople.collectAsStateWithLifecycle()
    LaunchedEffect(Unit) {
-      viewModel.refreshFromWebservice() // Ensuring refresh is called at least once
+      viewModel.refreshPeopleFromWeb() // Ensuring refresh is called at least once
    }
 
    val coroutineScope = rememberCoroutineScope()
@@ -102,11 +102,8 @@ fun PeopleListScreen(
          FloatingActionButton(
             containerColor = MaterialTheme.colorScheme.tertiary,
             onClick = {
-               // FAB clicked -> InputScreen initialized
                logDebug(tag, "FAB clicked --> PersonInput")
                viewModel.clearState()
-               // Navigate to PersonDetail and put PeopleList on the back stack
-               navController.navigate(route = NavScreen.PersonInput.route)
             }
          ) {
             Icon(Icons.Default.Add, "Add a contact")
@@ -192,7 +189,7 @@ fun PeopleListScreen(
                            email = person.email,
                            phone = person.phone,
                            imagePath = person.imagePath ?: "",
-                           elevation = SetCardElevation(dismissState)
+                           elevation = setCardElevation(dismissState)
                         )
                      }
                   }

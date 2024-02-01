@@ -53,9 +53,6 @@ class Seed @Inject constructor(
    var workorder06: Workorder = Workorder()
 
    init {
-
-
-
       imagesUri = initializeImages()
       people = initializePeople(imagesUri)
       workorders = initializeWorkorders()
@@ -141,16 +138,16 @@ class Seed @Inject constructor(
       people.add(person)
 
       if(imagesUri.size == 10) {
-         people[0].imagePath = imagesUri[0]
-         people[1].imagePath = imagesUri[5]
-         people[2].imagePath = imagesUri[1]
-         people[3].imagePath = imagesUri[6]
-         people[4].imagePath = imagesUri[2]
-         people[5].imagePath = imagesUri[7]
-         people[6].imagePath = imagesUri[3]
-         people[7].imagePath = imagesUri[8]
-         people[8].imagePath = imagesUri[4]
-         people[9].imagePath = imagesUri[9]
+         people[0] = people[0].copy(imagePath = imagesUri[0])
+         people[1] = people[1].copy(imagePath = imagesUri[5])
+         people[2] = people[2].copy(imagePath = imagesUri[1])
+         people[3] = people[3].copy(imagePath = imagesUri[6])
+         people[4] = people[4].copy(imagePath = imagesUri[2])
+         people[5] = people[5].copy(imagePath = imagesUri[7])
+         people[6] = people[6].copy(imagePath = imagesUri[3])
+         people[7] = people[7].copy(imagePath = imagesUri[8])
+         people[8] = people[8].copy(imagePath = imagesUri[4])
+         people[9] = people[0].copy(imagePath = imagesUri[9])
       }
       return people
    }

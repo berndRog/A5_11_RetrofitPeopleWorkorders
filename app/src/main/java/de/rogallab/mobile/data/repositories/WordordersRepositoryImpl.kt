@@ -93,19 +93,6 @@ class WordordersRepositoryImpl @Inject constructor(
          }
       }
 
-   override suspend fun addAll(workorders: List<Workorder>): ResultData<Unit> =
-      withContext(_dispatcher) {
-         try {
-            // throw Exception("Error thrown in addAll()")
-            logDebug(tag, "addAll()")
-            val dtos: List<WorkorderDto> = workorders.map { toWorkorderDto(it) }
-            _dao.insertAll(dtos)
-            return@withContext ResultData.Success(Unit)
-         } catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
-      }
-
    override suspend fun update(workorder: Workorder): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
@@ -119,34 +106,18 @@ class WordordersRepositoryImpl @Inject constructor(
          }
       }
 
-   override suspend fun remove(workorder: Workorder): ResultData<Unit> =
+   override suspend fun remove(id: UUID): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
             // throw Exception("Error thrown in remove()")
-            val dto = toWorkorderDto(workorder)
             logDebug(tag, "remove()")
-            _dao.delete(dto)
+            _dao.delete(id)
             return@withContext ResultData.Success(Unit)
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
          }
       }
 
-   override suspend fun findByIdWithPerson(id: UUID): ResultData<Map<Workorder, Person?>> =
-      withContext(_dispatcher) {
-         try {
-            // selectByIdWithPerson() returns a Map of DTOs
-            logDebug(tag, ",loadWorkorderWithPerson()")
-            val mapDtos: Map<WorkorderDto, PersonDto?> = _dao.findByIdWithPerson(id)
-            // Transform the DTOs to domain entities
-            val map: Map<Workorder, Person?> = mapDtos
-               .mapKeys { entry -> toWorkorder(entry.key) }
-               .mapValues { entry -> entry.value?.let { toPerson(it) } }
-         return@withContext ResultData.Success(map)
-      } catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
-      }
 
    // W E B S E R V I C E
    override fun getAll(): Flow<ResultData<List<Workorder>>> = flow {
@@ -172,21 +143,18 @@ class WordordersRepositoryImpl @Inject constructor(
       emit(ResultData.Failure(t))
    }  .flowOn(_dispatcher)
 
-   override suspend fun getById(id: UUID): ResultData<Workorder> =
+   override suspend fun getById(id: UUID): ResultData<Workorder?> =
       withContext(_dispatcher) {
          try {
             val response = _webservice.getById(id)
             logResponse(tag, response)
-
-            if (response.isSuccessful) {
-               response.body()?.let { workorderDto ->
-                  val workorder: Workorder = toWorkorder(workorderDto)
-                  return@withContext ResultData.Success(workorder)
-               } ?: run {
-                  return@withContext ResultData.Failure(IOException("response.body() is null"))
-               }
-            } else {
+            if (! response.isSuccessful)
                return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
+
+            response.body()?.let { workorderDto ->
+               return@withContext ResultData.Success(toWorkorder(workorderDto))
+            } ?: run {
+               return@withContext ResultData.Success(null)
             }
          } catch(t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -223,17 +191,15 @@ class WordordersRepositoryImpl @Inject constructor(
          }
       }
 
-   override suspend fun delete(workorder: Workorder): ResultData<Unit> =
+   override suspend fun delete(id: UUID): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
             // throw Exception("Error thrown in remove()")
             logDebug(tag, "remove()")
-            _webservice.delete(workorder.id)
+            _webservice.delete(id)
             return@withContext ResultData.Success(Unit)
          } catch (t: Throwable) {
             return@withContext ResultData.Failure(t)
          }
       }
-
-
 }

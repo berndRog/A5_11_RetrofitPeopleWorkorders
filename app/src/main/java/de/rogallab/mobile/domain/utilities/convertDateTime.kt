@@ -1,13 +1,14 @@
 package de.rogallab.mobile.domain.utilities
+import de.rogallab.mobile.ui.navigation.NavScreen
 import java.time.*
 import java.time.format.DateTimeFormatter
 
 val systemZoneId: ZoneId = ZoneId.systemDefault()
 
-
+// zoned date Time at epoch = 0, i.e. 1970-01-01T00:00:00Z
+val zonedDtMin = ZonedDateTime.ofInstant(Instant.EPOCH, ZoneId.systemDefault())
 
 val formatZDt:DateTimeFormatter = DateTimeFormatter.ofPattern("eee dd.MM.yyyy - HH:mm:ss:SSS z")
-
 //val formatLongDayOfWeek:DateTimeFormatter = DateTimeFormatter.ofPattern("eeee")
 val formatShortDayOfWeek:DateTimeFormatter = DateTimeFormatter.ofPattern("EE")
 //val formatLongDate:DateTimeFormatter = DateTimeFormatter.ofPattern("d. MMMM yyyy")

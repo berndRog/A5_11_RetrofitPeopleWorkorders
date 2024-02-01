@@ -1,11 +1,14 @@
 package de.rogallab.mobile.ui.workorders
 
 import androidx.compose.material3.SnackbarDuration
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.rogallab.mobile.domain.IPeopleRepository
 import de.rogallab.mobile.domain.IWorkorderUseCases
 import de.rogallab.mobile.domain.IWorkordersRepository
 import de.rogallab.mobile.domain.ResultData
@@ -18,9 +21,10 @@ import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.ErrorState
+import de.rogallab.mobile.ui.base.NavState
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.PeopleUiState
 import de.rogallab.mobile.ui.people.PeopleViewModel
+import de.rogallab.mobile.ui.people.PersonUiEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -29,12 +33,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -43,85 +48,35 @@ import javax.inject.Inject
 
 @HiltViewModel
 class WorkordersViewModel @Inject constructor(
-   private val _repository: IWorkordersRepository,
    private val _useCases: IWorkorderUseCases,
+   private val _repository: IWorkordersRepository,
+   private val _peopleRepository: IPeopleRepository,
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
-   var dbChanged: Boolean = false
+   var isWebservice: Boolean = false
 
-   var isWebservice: Boolean = true
-
-   private var _id: UUID = UUID.randomUUID()
-   val id
-      get() = _id
-   fun onIdChange(value: UUID) {
-      if (value != _id) _id = value
+   // Observer (DataBinding), Observable is a Person object
+   private val _workorderState: MutableState<Workorder> =  mutableStateOf(Workorder())
+   // access to the observable
+   val workorderStateValue: Workorder
+      get() = _workorderState.value  // Observable (DataBinding)
+   fun onWorkorderUiEventChange(event: WorkorderUiEvent, value: Any) {
+      _workorderState.value = when (event) {
+         WorkorderUiEvent.Title -> workorderStateValue.copy(title = value as String)
+         WorkorderUiEvent.Description -> workorderStateValue.copy(description = value as String)
+         WorkorderUiEvent.State -> workorderStateValue.copy(state = value as WorkState)
+         WorkorderUiEvent.Started -> workorderStateValue.copy(started = value as ZonedDateTime)
+         WorkorderUiEvent.Created -> workorderStateValue.copy(created = value as ZonedDateTime)
+         WorkorderUiEvent.Completed -> workorderStateValue.copy(completed = value as ZonedDateTime)
+         WorkorderUiEvent.Duration -> workorderStateValue.copy(duration = value as Duration)
+         WorkorderUiEvent.Remark -> workorderStateValue.copy(remark = value as String)
+         WorkorderUiEvent.ImagePath -> workorderStateValue.copy(imagePath = value as String?)
+         WorkorderUiEvent.Id -> workorderStateValue.copy(id = value as UUID)
+         WorkorderUiEvent.Person -> workorderStateValue.copy(person = value as Person?)
+         WorkorderUiEvent.PersonId -> workorderStateValue.copy(personId = value as UUID?)
+      }
    }
-
-   // Observables (DataBinding)
-   private var _created: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val created: ZonedDateTime
-      get() = _created
-   fun onCreatedChange(value: ZonedDateTime) {
-      if (value != _created) _created = value
-   }
-
-   private var _title: String by mutableStateOf(value = "")
-   val title: String
-      get() = _title
-   fun onTitleChange(value: String) {
-      if (value != _title) _title = value
-   }
-
-   private var _description: String by mutableStateOf(value = "")
-   val description: String
-      get() = _description
-   fun onDescriptionChange(value: String) {
-      if (value != _description) _description = value
-   }
-
-   private var _started: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val started: ZonedDateTime
-      get () = _started
-   fun onStartedChange(value: ZonedDateTime) {
-      _state = WorkState.Started
-      _started = value
-   }
-
-   private var _completed: ZonedDateTime by mutableStateOf(zonedDateTimeNow())
-   val completed: ZonedDateTime
-      get() = _completed
-   fun onCompletedChange(value: ZonedDateTime) {
-      _state = WorkState.Completed
-      _completed = value
-      _duration = Duration.between(_started.toInstant(),
-         _completed.toInstant())
-   }
-
-   private var _state: WorkState by mutableStateOf(WorkState.Default)
-   val state: WorkState
-      get() = _state
-
-   private var _duration: Duration = Duration.ZERO
-
-   private var _remark: String by mutableStateOf(value = "")
-   val remark: String
-      get() = _remark
-   fun onRemarkChange(value: String) {
-      if (value != _remark) _remark = value
-   }
-
-   private var _imagePath: String? by mutableStateOf(value = null)
-   val imagePath
-      get() = _imagePath
-   fun onImagePathChange(value: String?) {
-      if (value != _imagePath) _imagePath = value
-   }
-
-   private var _assignedPerson: Person? = null
-   val assignedPerson: Person?
-      get() = _assignedPerson
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
@@ -145,22 +100,33 @@ class WorkordersViewModel @Inject constructor(
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-
-   // Error State
-   var errorState by mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
-      private set
-
+   //
+   // Navigation State = ViewModel (one time) UI event
+   //
+   private var _navState: MutableState<NavState> =
+      mutableStateOf(NavState(onNavRequestHandled = ::onNavEventHandled))
+   val navStateValue: NavState
+      get() =  _navState.value
+   fun onNavEvent(route: String, clearBackStack: Boolean = true) {
+      _navState.value = navStateValue.copy(route = route, clearBackStack = clearBackStack)
+   }
+   fun onNavEventHandled() {
+      _navState.value = navStateValue.copy(route = null, clearBackStack = true )
+   }
+   //
+   // Error State = ViewModel (one time) UI event
+   //
+   private var _errorState: MutableState<ErrorState> =
+      mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
+   val errorStateValue: ErrorState
+      get() = _errorState.value
    fun showOnFailure(throwable: Throwable) =
       showOnError(throwable.localizedMessage ?: "Unknown error")
    fun showOnError(errorMessage: String) {
       logError(tag, errorMessage)
-      errorState = errorState.copy(
+      _errorState.value = errorStateValue.copy(
          errorParams = ErrorParams(
             message = errorMessage,
-            actionLabel = "ok",
-            duration = SnackbarDuration.Short,
-            withDismissAction = false,
-            onDismissAction = {},
             isNavigation = false
          ),
          onErrorHandled = ::onErrorEventHandled
@@ -171,13 +137,9 @@ class WorkordersViewModel @Inject constructor(
       showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
    fun showAndNavigateBackOnFailure(errorMessage: String) {
       logError(tag, errorMessage)
-      errorState = errorState.copy(
+      _errorState.value = errorStateValue.copy(
          errorParams = ErrorParams(
             message = errorMessage,
-            actionLabel = "ok",
-            duration = SnackbarDuration.Short,
-            withDismissAction = false,
-            onDismissAction = {},
             isNavigation = true,
             route = NavScreen.PeopleList.route
          )
@@ -185,67 +147,101 @@ class WorkordersViewModel @Inject constructor(
    }
    fun onErrorEventHandled() {
       logDebug(tag, "onErrorEventHandled()")
-      errorState = errorState.copy(errorParams = null)
+      _errorState.value = errorStateValue.copy(errorParams = null)
    }
-
-
    fun onErrorAction() {
       logDebug(tag, "onErrorAction()")
       // toDo
    }
 
-
-   // this works for room but not for a webservice
-//   val stateFlowWorkorders: StateFlow<WorkorderUiState> = flow {
-//      logDebug(tag,"stateFlowWorkorders() isWebservice=$isWebservice")
-//      _useCases.fetchWorkorders(isWebservice).collect { result: ResultData<List<Workorder>> ->
-//         when (result) {
-//            is ResultData.Loading -> {
-//               _stateWorkorders = _stateWorkorders.loading()
-//               emit(_stateWorkorders)
-//            }
-//            is ResultData.Success -> {
-//               _stateWorkorders = _stateWorkorders.success(result.data)
-//               emit(_stateWorkorders)
-//            }
-//            is ResultData.Failure -> showOnFailure(result.throwable)
-//         }
-//      }
-//   }  .catch { throwable ->
-//      showOnFailure(throwable)
-//   }  .flowOn(_dispatcher)
-//      .stateIn(
-//         viewModelScope,
-//         SharingStarted.WhileSubscribed(1_000),
-//         WorkorderUiState()
-//      )
-
-
    // StateFlow for List Screens
-   private var _stateWorkorders: WorkorderUiState by mutableStateOf(WorkorderUiState())
-   private var _stateFlowWorkordersPeople = MutableStateFlow(WorkorderUiState( ))
-   val stateFlowWorkorders: StateFlow<WorkorderUiState> = _stateFlowWorkordersPeople.asStateFlow()
+   private var _stateWorkordersValueDb: WorkordersUiState by mutableStateOf(WorkordersUiState())
+   private val _stateFlowWorkordersDb: StateFlow<WorkordersUiState> = fetchWorkordersFromDb()
 
-   fun refreshFromWebservice() {
-      _coroutineScope.launch {
-         logDebug(tag, "read()")
-         _useCases.getWorkorders().collect { result: ResultData<List<Workorder>> ->
-            when (result) {
-               is ResultData.Loading -> {
-                  _stateWorkorders = _stateWorkorders.copy(isLoading = true,
-                     isSuccessful = false, workorders = emptyList())
-                  _stateFlowWorkordersPeople.update { _stateWorkorders }
-               }
-               is ResultData.Success -> {
-                  _stateWorkorders = _stateWorkorders.copy(isLoading = true,
-                     isSuccessful = false, workorders = result.data)
-                  _stateFlowWorkordersPeople.update { _stateWorkorders }
-               }
-               is ResultData.Failure -> showOnFailure(result.throwable)
+   fun fetchWorkordersFromDb(): StateFlow<WorkordersUiState> = flow {
+      logDebug(tag,"fetchWorkordersFromDb()")
+      _useCases.selectWorkorders().collect { result: ResultData<List<Workorder>> ->
+         when (result) {
+            is ResultData.Loading -> {
+               _stateWorkordersValueDb = _stateWorkordersValueDb.copy(isLoading = true,
+                  isSuccessful = false, workorders = emptyList())
+               emit(_stateWorkordersValueDb)
             }
+            is ResultData.Success -> {
+               _stateWorkordersValueDb = _stateWorkordersValueDb.copy(isLoading = false,
+                  isSuccessful = true, workorders = result.data)
+               emit(_stateWorkordersValueDb)
+            }
+            is ResultData.Failure -> showOnFailure(result.throwable)
          }
       }
+   }  .catch { throwable ->
+      showOnFailure(throwable)
+   }  .flowOn(_dispatcher)
+      .stateIn(
+         viewModelScope,
+         SharingStarted.WhileSubscribed(1_000),
+         WorkordersUiState()
+      )
+   // refresh
+   fun refreshFromDb() {
+      _stateWorkordersValueDb = WorkordersUiState() // Reset the state
+      fetchWorkordersFromDb() // Re-invoke the flow
    }
+   
+   private var _stateWorkordersValueWeb: WorkordersUiState by mutableStateOf(WorkordersUiState( ))
+   private var _stateFlowWorkordersWeb: MutableStateFlow<WorkordersUiState> = MutableStateFlow(WorkordersUiState())
+
+   fun fetchWorkordersFromWeb(): Flow<WorkordersUiState> = flow {
+      if(!isWebservice) emit(WorkordersUiState())
+      logDebug(tag, "refreshFromWebservice()")
+      _useCases.getWorkorders().collect { result: ResultData<List<Workorder>> ->
+         when (result) {
+            is ResultData.Loading -> {
+               _stateWorkordersValueWeb = _stateWorkordersValueWeb.copy(isLoading = true,
+                  isSuccessful = false, workorders = emptyList())
+               emit(_stateWorkordersValueWeb)
+            }
+            is ResultData.Success -> {
+               _stateWorkordersValueWeb = _stateWorkordersValueWeb.copy(isLoading = true,
+                  isSuccessful = false, workorders = result.data)
+               emit(_stateWorkordersValueWeb)
+            }
+            is ResultData.Failure -> showOnFailure(result.throwable)
+         }
+      }
+   }  .catch { throwable ->
+      showOnFailure(throwable)
+   }  .flowOn(_dispatcher)
+      .stateIn(
+         viewModelScope,
+         SharingStarted.WhileSubscribed(1_000),
+         WorkordersUiState()
+      )
+
+   // refresh
+   fun refreshWorkordersFromWeb() {
+      _stateWorkordersValueWeb = WorkordersUiState() // Reset the state
+      fetchWorkordersFromWeb()
+   }
+
+   // Combine both StateFlows (i.e. caching strategy is needed for combining)
+   val stateFlowWorkorders: StateFlow<WorkordersUiState> = combine(
+      _stateFlowWorkordersDb,
+      _stateFlowWorkordersWeb
+   ) { stateFromDb: WorkordersUiState, stateFromWeb: WorkordersUiState ->
+      // Here you decide how to combine both states.
+      // For instance, you might want to prioritize remote data over local data or vice versa.
+      when {
+         stateFromWeb.isSuccessful  -> stateFromWeb // remote data is prioritized
+         stateFromDb.isSuccessful -> stateFromDb
+         else -> WorkordersUiState(isLoading = true) // or any other default state
+      }
+   }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(1_000),
+      WorkordersUiState()
+   )
 
    fun readById(id: UUID) {
       _coroutineScope.launch {
@@ -255,10 +251,7 @@ class WorkordersViewModel @Inject constructor(
          else             result = _repository.findById(id)
          when (result) {
             is ResultData.Success -> {
-               result.data?.let { it: Workorder ->
-                  setStateFromWorkorder(it)
-                  dbChanged = false
-               }
+               result.data?.let { it: Workorder -> setStateFromWorkorder(it) }
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
@@ -276,15 +269,16 @@ class WorkordersViewModel @Inject constructor(
          when (result) {
             is ResultData.Loading -> Unit
             is ResultData.Success -> {
-               if(isWebservice) refreshFromWebservice()
-               else dbChanged = true
+               if(isWebservice) fetchWorkordersFromWeb()
+               else refreshFromDb()
+               //onNavEvent(NavScreen.PeopleList.route)
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
          }
       }
    }
 
-   fun update(w: Workorder? = null) {
+   fun update(w: Workorder? = null, route:String? = null) {
       val workorder = w ?: getWorkorderFromState()
       _coroutineScope.launch {
          logDebug(tag,"update() isWebservice=$isWebservice")
@@ -294,8 +288,12 @@ class WorkordersViewModel @Inject constructor(
          when (result) {
             is ResultData.Loading -> Unit
             is ResultData.Success -> {
-               if(isWebservice) refreshFromWebservice()
-               else dbChanged = true
+               if(isWebservice) fetchWorkordersFromWeb()
+               else refreshFromDb()
+               route?.let {
+                  onNavEvent(route)
+               }
+
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
          }
@@ -303,16 +301,15 @@ class WorkordersViewModel @Inject constructor(
    }
 
    fun remove(id: UUID) {
-      val workorder = getWorkorderFromState(id)
       _coroutineScope.launch {
          logDebug(tag,"remove() isWebservice=$isWebservice")
          var result: ResultData<Unit>
-         if(isWebservice) result = _repository.delete(workorder)
-         else             result = _repository.remove(workorder)
+         if(isWebservice) result = _repository.delete(id)
+         else             result = _repository.remove(id)
          when (result) {
             is ResultData.Success ->  {
-               if(isWebservice) refreshFromWebservice()
-               else dbChanged = true
+               if(isWebservice) fetchWorkordersFromWeb()
+               else refreshFromDb()
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
@@ -323,60 +320,78 @@ class WorkordersViewModel @Inject constructor(
    fun readByIdWithPerson(id: UUID) {
       _coroutineScope.launch {
          logDebug(tag,"readByIdWithPerson(${id.as8()}) isWebservice=$isWebservice")
-         when (val result: ResultData<Map<Workorder, Person?>> =
-            _repository.findByIdWithPerson(id)) {
+         // read workorder
+         var resultWorkorder: ResultData<Workorder?>
+         if(isWebservice) resultWorkorder = _repository.getById(id)
+         else             resultWorkorder = _repository.findById(id)
+         when (resultWorkorder) {
+            is ResultData.Failure -> showAndNavigateBackOnFailure(resultWorkorder.throwable)
             is ResultData.Success -> {
-               val map: Map<Workorder, Person?> = result.data
-               val workorder: Workorder = map.keys.first()
+               if(resultWorkorder.data == null) {
+                  showAndNavigateBackOnFailure("Workorder not found")
+                  return@launch
+               }
+               val workorder: Workorder = resultWorkorder.data!!
                setStateFromWorkorder(workorder)
-               _assignedPerson = map.values.firstOrNull()
-               logDebug(tag, "readById() ${workorder.asString()}")
-               dbChanged = false
+               workorder.personId?.let { personId ->
+                  // read assigned person
+                  val resultPerson: ResultData<Person?>
+                  if(isWebservice) resultPerson = _peopleRepository.getById(personId)
+                  else             resultPerson = _peopleRepository.findById(personId)
+                  when (resultPerson) {
+                     is ResultData.Success -> {
+                        // set assigned person
+                       _workorderState.value =
+                          workorderStateValue.copy(person = resultPerson.data)
+                     }
+                     is ResultData.Failure -> showAndNavigateBackOnFailure(resultPerson.throwable)
+                     else -> Unit
+                  }
+               }
             }
-            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
    }
 
-   fun getWorkorderFromState(
-      id: UUID? = null
-   ): Workorder =
-      id?.let {
-         return@let Workorder(_title, _description, _created, _started, _completed,
-            _duration, _remark, _imagePath, _state, id, _assignedPerson, _assignedPerson?.id)
-      } ?: run {
-         return@run Workorder(_title, _description, _created, _started, _completed,
-            _duration, _remark, _imagePath, _state, _id, _assignedPerson, _assignedPerson?.id)
-      }
-
-   private fun setStateFromWorkorder(
-      workOrder: Workorder
-   ) {
-      _title = workOrder.title
-      _description = workOrder.description
-      _created = workOrder.created
-      _started = workOrder.started
-      _completed = workOrder.completed
-      _state = workOrder.state
-      _duration = workOrder.duration
-      _remark = workOrder.remark
-      _imagePath = workOrder.imagePath
-      _id = workOrder.id
-      _assignedPerson = workOrder.person
-   }
 
    fun clearState() {
-      _created = zonedDateTimeNow()
-      _title = ""
-      _description = ""
-      _started = _created
-      _completed = _created
-      _state = WorkState.Default
-      _remark = ""
-      _imagePath = null
-      _id = UUID.randomUUID()
-      _assignedPerson = null
+      logDebug(tag, "clearState")
+      _workorderState.value = Workorder()
+      onNavEvent(route = NavScreen.WorkorderInput.route, clearBackStack = false)
+   }
+
+   private fun getWorkorderFromState(): Workorder =
+      Workorder(
+         title         = workorderStateValue.title,
+         description   = workorderStateValue.description,
+         imagePath     = workorderStateValue.imagePath,
+         state         = workorderStateValue.state,
+         created       = workorderStateValue.created,
+         started       = workorderStateValue.started,
+         completed     = workorderStateValue.completed,
+         duration      = workorderStateValue.duration,
+         remark        = workorderStateValue.remark,
+         id            = workorderStateValue.id,
+         person        = workorderStateValue.person,
+         personId      = workorderStateValue.personId
+      )
+
+   private fun setStateFromWorkorder(workorder: Workorder) {
+      _workorderState.value = workorderStateValue.copy(
+         title        = workorder.title,
+         description  = workorder.description,
+         imagePath    = workorder.imagePath,
+         state        = workorder.state,
+         created      = workorder.created,
+         started      = workorder.started,
+         completed    = workorder.completed,
+         duration     = workorder.duration,
+         remark       = workorder.remark,
+         id           = workorder.id,
+         person       = workorder.person,
+         personId     = workorder.personId
+      )
    }
 
    companion object {

@@ -11,6 +11,7 @@ import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.mapping.toPerson
 import de.rogallab.mobile.domain.mapping.toPersonDto
 import de.rogallab.mobile.domain.mapping.toWorkorder
+import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
 import kotlinx.coroutines.CoroutineDispatcher
@@ -37,7 +38,7 @@ class PeopleRepositoryImpl @Inject constructor(
       try {
          var flowPeopleDto: Flow<List<PersonDto>> = _dao.selectAll()
          flowPeopleDto.collect { peopleDto: List<PersonDto> ->
-            val people: List<Person> = peopleDto.map { it -> toPerson(it) }
+            val people: List<Person> = peopleDto.map { it: PersonDto -> toPerson(it) }
             logDebug(tag, "selectAll() ${people.size} items")
             emit(ResultData.Success(people))
          }
@@ -49,11 +50,11 @@ class PeopleRepositoryImpl @Inject constructor(
          emit(ResultData.Failure(t))
    } .flowOn(_dispatcher)
 
+   //throw Exception("Test Error thrown in findById()")
 
    override suspend fun findById(id: UUID): ResultData<Person?> =
       withContext(_dispatcher) {
          try {
-            //throw Exception("Test Error thrown in findById()")
             _dao.selectById(id)?.let { dto: PersonDto ->
                val person: Person = toPerson(dto)
                logDebug(tag, "findById() success")
@@ -62,70 +63,44 @@ class PeopleRepositoryImpl @Inject constructor(
                val message = "Item with given id not found"
                return@withContext ResultData.Failure(Exception(message))
             }
-         } catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         } catch (t: Throwable) { return@withContext ResultData.Failure(t) }
       }
 
    override suspend fun count(): ResultData<Int> =
       withContext(_dispatcher + _exceptionHandler) {
          try {
             val records = _dao.count()
-            logDebug(tag, "count() $records")
             return@withContext ResultData.Success(records)
-         } catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         } catch (t: Throwable) { return@withContext ResultData.Failure(t) }
       }
 
    override suspend fun add(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
-            val personDto = toPersonDto(person)
-//            throw Exception("Test Error thrown in add")
-            logDebug(tag, "insert() ${personDto.asString()}")
-            _dao.insert(personDto)
+            logDebug(tag, "insert() ${person.asString()}")
+            _dao.insert(toPersonDto(person))
             return@withContext ResultData.Success(Unit)
-         } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
-      }
-
-   override suspend fun addAll(people: List<Person>): ResultData<Unit> =
-      withContext(_dispatcher) {
-         try {
-            val peopleDto = people.map { person -> toPersonDto(person) }
-            logDebug(tag, "insertAll() ${people.size}")
-            _dao.insertAll(peopleDto)
-            return@withContext ResultData.Success(Unit)
-         } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         } catch(t: Throwable) {  return@withContext ResultData.Failure(t)}
       }
 
    override suspend fun update(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
-            val personDto = toPersonDto(person)
-            logDebug(tag, "update() ${personDto.asString()}")
-//          throw Exception("Error thrown in update()")
-            _dao.update(personDto)
+            logDebug(tag, "update() ${person.asString()}")
+            _dao.update(toPersonDto(person))
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {
             return@withContext ResultData.Failure(t)
          }
       }
 
-   override suspend fun remove(person: Person): ResultData<Unit> =
+   override suspend fun remove(id: UUID): ResultData<Unit> =
       withContext(_dispatcher ) {
          try {
-            val personDto = toPersonDto(person)
-            logDebug(tag, "remove() ${personDto.asString()}")
-            _dao.delete(personDto)
+            logDebug(tag, "remove() ${id.as8()}")
+            _dao.delete(id)
             return@withContext ResultData.Success(Unit)
-         } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         } catch(t: Throwable) { return@withContext ResultData.Failure(t) }
       }
 
 //   override suspend fun selectByIdWithWorkorders(id: UUID): ResultData<Person?> =
@@ -154,9 +129,7 @@ class PeopleRepositoryImpl @Inject constructor(
                   "${person?.asString()} ${person?.workorders?.size} workorders")
             return@withContext ResultData.Success(person)
          }
-         catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         catch (t: Throwable) { return@withContext ResultData.Failure(t) }
       }
 
    // W E B S E R V I C E
@@ -169,19 +142,16 @@ class PeopleRepositoryImpl @Inject constructor(
             emit(ResultData.Failure(IOException("${httpStatusMessage(response.code())}")))
             return@flow
          }
-
          val people = response.body()?.map {
             it: PersonDto -> toPerson(it)
          }  ?: run {
             emit(ResultData.Failure(IOException("response.body() is null")))
             return@flow
          }
-
          emit(ResultData.Success(people))
 
-      }  catch(t: Throwable) {
-         emit(ResultData.Failure(t))
-      }
+      }  catch(t: Throwable) { emit(ResultData.Failure(t)) }
+
    }.flowOn(_dispatcher).catch { t: Throwable -> emit(ResultData.Failure(t)) }
 
    override suspend fun getById(id: UUID): ResultData<Person> =
@@ -189,7 +159,6 @@ class PeopleRepositoryImpl @Inject constructor(
          try {
             val response = _webservice.getById(id)
             logResponse(tag, response)
-
             if (!response.isSuccessful)
                return@withContext ResultData.Failure(
                   IOException(" ${httpStatusMessage(response.code())}"))
@@ -197,60 +166,52 @@ class PeopleRepositoryImpl @Inject constructor(
             response.body()?.let { personDto ->
                val person: Person = toPerson(personDto)
                return@withContext ResultData.Success(person)
-            } ?: return@withContext ResultData.Failure(IOException("response.body() is null"))
+            } ?: return@withContext ResultData.Failure(
+                                       IOException("response.body() is null"))
 
-         } catch(t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         } catch(t: Throwable) {  return@withContext ResultData.Failure(t) }
       }
 
    override suspend fun post(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
             val response = _webservice.post(toPersonDto(person))
-            // logResponse(tag, response)
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
-               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
+               return@withContext ResultData.Failure(
+                                     IOException("${httpStatusMessage(response.code())}"))
             }
          }
-         catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         catch (t: Throwable) { return@withContext ResultData.Failure(t) }
       }
 
    override suspend fun put(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
             val response = _webservice.put(person.id, toPersonDto(person))
-            // logResponse(tag, response)
-            if (response.isSuccessful) {
-               return@withContext ResultData.Success(Unit)
-            } else {
-               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
-            }
-         }
-         catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
-      }
-
-   override suspend fun delete(person: Person): ResultData<Unit> =
-      withContext(_dispatcher + _exceptionHandler) {
-         try {
-            val response = _webservice.delete(person.id)
-            // logResponse(tag, response)
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
                return@withContext ResultData.Failure(
-                  IOException("${httpStatusMessage(response.code())}"))
+                                     IOException("${httpStatusMessage(response.code())}"))
             }
          }
-         catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
+         catch (t: Throwable) { return@withContext ResultData.Failure(t) }
+      }
+
+   override suspend fun delete(id:UUID): ResultData<Unit> =
+      withContext(_dispatcher) {
+         try {
+            val response = _webservice.delete(id)
+            if (response.isSuccessful) {
+               return@withContext ResultData.Success(Unit)
+            } else {
+               return@withContext ResultData.Failure(
+                                    IOException("${httpStatusMessage(response.code())}"))
+            }
          }
+         catch (t: Throwable) { return@withContext ResultData.Failure(t) }
       }
 
    override suspend fun getByIdWithWorkorders(id: UUID): ResultData<Person?> =
@@ -275,15 +236,11 @@ class PeopleRepositoryImpl @Inject constructor(
             } ?: return@withContext ResultData.Failure(IOException("response.body() is null"))
 
             logDebug(tag, "getByIdWithWorkorders() " +
-               "${person.asString()} ${person.workorders?.size} workorders")
+               "${person.asString()} ${person.workorders.size} workorders")
             return@withContext ResultData.Success(person)
          }
-         catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
+         catch (t: Throwable) {  return@withContext ResultData.Failure(t) }
       }
-
-
 
    companion object {
       //12345678901234567890123

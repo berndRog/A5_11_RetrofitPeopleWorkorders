@@ -11,9 +11,8 @@ interface IPeopleRepository {
    suspend fun findById(id: UUID): ResultData<Person?>
    suspend fun count(): ResultData<Int>
    suspend fun add(person: Person): ResultData<Unit>
-   suspend fun addAll(people: List<Person>): ResultData<Unit>
    suspend fun update(person: Person): ResultData<Unit>
-   suspend fun remove(person: Person): ResultData<Unit>
+   suspend fun remove(id: UUID): ResultData<Unit>
 
 // suspend fun selectByIdWithWorkorders(id: UUID): ResultData<Person?>
    suspend fun findByIdWithWorkorders(id:UUID): ResultData<Person?>
@@ -23,7 +22,7 @@ interface IPeopleRepository {
    suspend fun getById(id: UUID): ResultData<Person?>
    suspend fun post(person: Person): ResultData<Unit>
    suspend fun put(person: Person): ResultData<Unit>
-   suspend fun delete(person: Person): ResultData<Unit>
+   suspend fun delete(id: UUID): ResultData<Unit>
 
    suspend fun getByIdWithWorkorders(id: UUID): ResultData<Person?>
 }

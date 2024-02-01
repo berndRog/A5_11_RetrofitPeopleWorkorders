@@ -7,9 +7,11 @@ import java.util.UUID
 
 @Entity(tableName = "images")
 data class ImageDto(
-   val contentType: String = "",
    val remoteUriPath: String = "",
+   val contentType: String = "",
+   val updated: String = "",
    val userId: UUID = UUIDEmpty,
    @PrimaryKey
    val id: UUID = UUID.randomUUID()
+
 )

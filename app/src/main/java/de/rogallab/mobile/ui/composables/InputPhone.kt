@@ -1,4 +1,4 @@
-package de.rogallab.mobile.ui.people.composables
+package de.rogallab.mobile.ui.composables
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,12 +26,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.rogallab.mobile.R
+import de.rogallab.mobile.ui.people.PersonUiEvent
+import de.rogallab.mobile.ui.base.validatePhone
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun InputPhone(
-   phone: String?,                           // State ↓
-   onPhoneChange: (String) -> Unit,          // Event ↑
+   phone: String?,                                  // State ↓
+   onPhoneChange: (PersonUiEvent, String) -> Unit,  // Event ↑
 ) {
 // val tag = "ok>InputNameMailPhone ."
    val focusManager = LocalFocusManager.current
@@ -49,23 +51,20 @@ fun InputPhone(
          .padding(horizontal = 8.dp)
          .fillMaxWidth()
          .onFocusChanged { focusState ->
-            if (!focusState.isFocused && isFocus && validatePhone(phone)) {
-               isError = true
-               errorText = errorMessage
-            } else {
-               isError = false
-               errorText = ""
+            if (!focusState.isFocused && isFocus) {
+               val (e,t) = validatePhone(phone, errorMessage)
+               isError = e
+               errorText = t
             }
             isFocus = focusState.isFocused
          },
       value = phone ?: "",
-      onValueChange = { onPhoneChange(it) }, // Event ↑
+      onValueChange = { onPhoneChange(PersonUiEvent.Phone, it.trim()) }, // Event ↑
       label = { Text(text = label) },
       textStyle = MaterialTheme.typography.bodyLarge,
       leadingIcon = {
-         Icon(
-            imageVector = Icons.Outlined.Phone,
-            contentDescription = label)
+         Icon(imageVector = Icons.Outlined.Phone,
+              contentDescription = label)
       },
       singleLine = true,
       keyboardOptions = KeyboardOptions(
@@ -76,16 +75,13 @@ fun InputPhone(
       keyboardActions = KeyboardActions(
          onDone = {
             keyboardController?.hide()
-            if (validatePhone(phone)) {
-               isError = true
-               errorText = errorMessage
-            } else {
-               isError = false
-               errorText = ""
-            }
+            val (e,t) = validatePhone(phone, errorMessage)
+            isError = e
+            errorText = t
             if(!isError) {
+               keyboardController?.hide()
                focusManager.clearFocus()
-            } // close keyboard
+            }
          }
       ),
       isError = isError,
@@ -108,8 +104,3 @@ fun InputPhone(
       },
    )
 }
-
-fun validatePhone(phone: String?): Boolean =
-   phone?.let {
-      !android.util.Patterns.PHONE.matcher(it).matches()
-   } ?: true

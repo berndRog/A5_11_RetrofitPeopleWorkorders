@@ -33,11 +33,11 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
+import de.rogallab.mobile.ui.composables.InputEmail
+import de.rogallab.mobile.ui.composables.InputName
+import de.rogallab.mobile.ui.composables.InputPhone
 import de.rogallab.mobile.ui.composables.SelectAndShowImage
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.InputMail
-import de.rogallab.mobile.ui.people.composables.InputName
-import de.rogallab.mobile.ui.people.composables.InputPhone
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +49,9 @@ fun PersonScreen(
    viewModel: PeopleViewModel,
 ) {
    var tag = "ok>PersonInputScreen ."
+   var charMin = 2
+   var charMax = 16
+
    val isInput: Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
 
    if (!isInput) {
@@ -57,7 +60,6 @@ fun PersonScreen(
          LaunchedEffect(Unit) {
             logDebug(tag, "ReadById()")
             viewModel.readById(id)
-            viewModel.onIdChange(id)
          }
       } ?: run {
          viewModel.showAndNavigateBackOnFailure("No id for person is given")
@@ -74,7 +76,6 @@ fun PersonScreen(
       }
    )
 
-   val context = LocalContext.current
    val snackbarHostState = remember { SnackbarHostState() }
    Scaffold(
       topBar = {
@@ -82,12 +83,15 @@ fun PersonScreen(
             title = { Text(stringResource(R.string.person_detail)) },
             navigationIcon = {
                IconButton(onClick = {
-                  if (!viewModel.isValid(context, viewModel)) {
-                     if (isInput) viewModel.add() else viewModel.update(id!!)
-                     navController.navigate(route = NavScreen.PeopleList.route) {
-                        popUpTo(route = NavScreen.PersonDetail.route) { inclusive = true }
-                     }
-                  }
+                  // Check input fields and navigate to people list or show error
+                  viewModel.validateAndNavigate(isInput, charMin, charMax)
+
+               //      if (!viewModel.isValid(context, viewModel)) {
+//                     if (isInput) viewModel.add() else viewModel.update(id!!)
+//                     navController.navigate(route = NavScreen.PeopleList.route) {
+//                        popUpTo(route = NavScreen.PersonDetail.route) { inclusive = true }
+//                     }
+//                  }
                }) {
                   Icon(
                      imageVector = Icons.Default.ArrowBack,
@@ -114,30 +118,24 @@ fun PersonScreen(
             .verticalScroll(state = rememberScrollState())
       ) {
          InputName(
-            name = viewModel.firstName,                  // State ↓
-            onNameChange = viewModel::onFirstNameChange, // Event ↑
-            label = stringResource(R.string.firstName),
-            errorTooShort = stringResource(R.string.errorFirstNameTooShort),
-            errorTooLong = stringResource(R.string.errorFirstNameTooLong)
+            firstName = viewModel.personStateValue.firstName,     // State ↓
+            onFirstNameChange = viewModel::onPersonUiEventChange, // Event ↑
+            lastName = viewModel.personStateValue.lastName,       // State ↓
+            onLastNameChange = viewModel::onPersonUiEventChange,  // Event ↑
+            charMin = charMin,
+            charMax = charMax
          )
-         InputName(
-            name = viewModel.lastName,                   // State ↓
-            onNameChange = viewModel::onLastNameChange,  // Event ↑
-            label = stringResource(R.string.lastName),
-            errorTooShort = stringResource(R.string.errorLastNameTooShort),
-            errorTooLong = stringResource(R.string.errorLastNameTooLong)
-         )
-         InputMail(
-            email = viewModel.email,                     // State ↓
-            onEmailChange = viewModel::onEmailChange,    // Event ↑
+         InputEmail(
+            email = viewModel.personStateValue.email,             // State ↓
+            onEmailChange = viewModel::onPersonUiEventChange,     // Event ↑
          )
          InputPhone(
-            phone = viewModel.phone,                     // State ↓
-            onPhoneChange = viewModel::onPhoneChange,    // Event ↑
+            phone = viewModel.personStateValue.phone,             // State ↓
+            onPhoneChange = viewModel::onPersonUiEventChange,     // Event ↑
          )
          SelectAndShowImage(
-            imagePath = viewModel.imagePath,                  // State ↓
-            onImagePathChanged = viewModel::onImagePathChange // Event ↑
+            imagePath = viewModel.personStateValue.imagePath,     // State ↓
+            onImagePathChanged = viewModel::onPersonUiEventChange // Event ↑
          )
       }
    }

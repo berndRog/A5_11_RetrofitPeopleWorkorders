@@ -7,6 +7,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ViewModelComponent
 import dagger.hilt.android.scopes.ViewModelScoped
+import de.rogallab.mobile.domain.resources.PeopleErrorMessages
+import de.rogallab.mobile.domain.resources.ResourceProvider
 import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logInfo
 import kotlinx.coroutines.CoroutineDispatcher
@@ -27,6 +29,24 @@ object ProvideDomainModules {
    ): Context {
       logInfo(tag, "providesContext()")
       return application.applicationContext
+   }
+
+   @Provides
+   @ViewModelScoped
+   fun provideResourceProvider(
+      context: Context
+   ): ResourceProvider {
+      logInfo(tag, "providesResourceProvider()")
+      return ResourceProvider(context)
+   }
+
+   @Provides
+   @ViewModelScoped
+   fun providePeopleErrorMessages(
+      resourceProvider: ResourceProvider
+   ): PeopleErrorMessages {
+      logInfo(tag, "providesPeopleErrorMessages()")
+      return PeopleErrorMessages(resourceProvider)
    }
 
    @Provides

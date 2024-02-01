@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
+import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
@@ -43,7 +44,7 @@ import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.evalWorkorderStateAndTime
+import de.rogallab.mobile.ui.composables.evalWorkorderStateAndTime
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,17 +60,12 @@ fun WorkorderScreen(
    val isInput:Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
 
 
-
-
-
-
    if (! isInput) {
       tag = "ok>WorkorderDetailScr ."
       id?.let {
          LaunchedEffect(Unit) {
             logDebug(tag, "ReadById()")
             viewModel.readById(id)
-            viewModel.onIdChange(id)
          }
       } ?: run {
 //         viewModel.onTriggerErrorEvent(
@@ -130,37 +126,38 @@ fun WorkorderScreen(
       ) {
 
          if(isInput) {
-            viewModel.onCreatedChange(zonedDateTimeNow())
+            viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Created, zonedDateTimeNow())
 
             Column(modifier = Modifier.padding(top = 8.dp)) {
                Text(
-                  text = zonedDateTimeString(viewModel.created),
+                  text = zonedDateTimeString(viewModel.workorderStateValue.created),   // State ↓
                   modifier = Modifier.fillMaxWidth().align(Alignment.End),
                   style = MaterialTheme.typography.bodySmall,
                )
                OutlinedTextField(
-                  value = viewModel.title,                          // State ↓
-                  onValueChange = { viewModel.onTitleChange(it) },  // Event ↑
+                  value = viewModel.workorderStateValue.title,                         // State ↓
+                  onValueChange = {                                                    // Event ↑
+                     viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Title, it) },
                   modifier = Modifier.fillMaxWidth(),
-                  label = { Text(text = stringResource(id = R.string.title)) },
+                  label = { Text(stringResource(R.string.title)) },
                   textStyle = MaterialTheme.typography.bodyMedium,
                   singleLine = true
                )
                OutlinedTextField(
-                  value = viewModel.description,                          // State ↓
-                  onValueChange = { viewModel.onDescriptionChange(it) },  // Event ↑
+                  value = viewModel.workorderStateValue.description,                          // State ↓
+                  onValueChange = {
+                     viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Description, it) },  // Event ↑
                   modifier = Modifier.fillMaxWidth(),
-                  label = { Text(text = stringResource(id = R.string.description)) },
+                  label = { Text(stringResource(R.string.description)) },
                   singleLine = false,
                   textStyle = MaterialTheme.typography.bodyMedium
                )
             }
          } else {
 
-            val workorder = viewModel.getWorkorderFromState()
 
-            if (workorder.state != WorkState.Default) {
-               workorder.person?.let {
+            if (viewModel.workorderStateValue.state != WorkState.Default) {
+               viewModel.workorderStateValue.person?.let { it: Person ->
                   PersonCard(
                      firstName = it.firstName,
                      lastName = it.lastName,
@@ -172,33 +169,33 @@ fun WorkorderScreen(
             }
 
             Text(
-               text = zonedDateTimeString(viewModel.created),
+               text = zonedDateTimeString(viewModel.workorderStateValue.created),   // State ↓
                modifier = Modifier.fillMaxWidth().align(Alignment.End),
                style = MaterialTheme.typography.bodySmall,
             )
             OutlinedTextField(
-               value = viewModel.title,                          // State ↓
-               onValueChange = { viewModel.onTitleChange(it) },  // Event ↑
+               value = viewModel.workorderStateValue.title,                          // State ↓
+               onValueChange = {
+                  viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Title, it) },  // Event ↑
                modifier = Modifier.fillMaxWidth(),
-               readOnly = viewModel.state != WorkState.Default,
+               readOnly = viewModel.workorderStateValue.state != WorkState.Default,
                label = { Text(text = stringResource(id = R.string.title)) },
                textStyle = MaterialTheme.typography.bodyMedium,
                singleLine = true
             )
             OutlinedTextField(
-               value = viewModel.description,                          // State ↓
-               onValueChange = { viewModel.onDescriptionChange(it) },  // Event ↑
+               value = viewModel.workorderStateValue.description,                   // State ↓
+               onValueChange = {                                                    // Event ↑
+                  viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Description, it) },
                modifier = Modifier.fillMaxWidth(),
-               readOnly = viewModel.state != WorkState.Default,
+               readOnly = viewModel.workorderStateValue.state != WorkState.Default,
                label = { Text(text = stringResource(id = R.string.description)) },
                singleLine = false,
                textStyle = MaterialTheme.typography.bodyMedium
             )
 
-
-            if(workorder.state != WorkState.Default) {
-
-               val (state, time) = evalWorkorderStateAndTime(workorder)
+            if(viewModel.workorderStateValue.state != WorkState.Default) {
+               val (state, time) = evalWorkorderStateAndTime(viewModel.workorderStateValue)
 
                Row(modifier = Modifier.padding(top = 16.dp),
                   horizontalArrangement = Arrangement.Absolute.Right,
@@ -207,16 +204,12 @@ fun WorkorderScreen(
                   Text(
                      text = time,
                      style = MaterialTheme.typography.bodyMedium,
-                     modifier = Modifier
-                        .padding(start = 4.dp)
-                        .weight(0.6f)
+                     modifier = Modifier.padding(start = 4.dp).weight(0.6f)
                   )
                   FilledTonalButton(
                      onClick = {},
                      enabled = false,
-                     modifier = Modifier
-                        .padding(end = 4.dp)
-                        .weight(0.4f)
+                     modifier = Modifier.padding(end = 4.dp).weight(0.4f)
                   ) {
                      Text(
                         text = state,
@@ -229,7 +222,7 @@ fun WorkorderScreen(
       }
    }
 
-   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+   viewModel.errorStateValue.errorParams?.let { params: ErrorParams ->
       LaunchedEffect(params) {
          showAndRespondToError(
             errorParams = params,

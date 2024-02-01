@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -23,11 +25,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import de.rogallab.mobile.R
+import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
@@ -35,21 +44,23 @@ import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
+import de.rogallab.mobile.ui.base.validateName
+import de.rogallab.mobile.ui.composables.InputWorkorderCompleted
+import de.rogallab.mobile.ui.composables.InputStartWorkorder
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
-import de.rogallab.mobile.ui.people.composables.InputCompleted
-import de.rogallab.mobile.ui.people.composables.InputStarted
+import de.rogallab.mobile.ui.workorders.WorkorderUiEvent
 import de.rogallab.mobile.ui.workorders.WorkordersViewModel
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
-fun PersonWorkorderDetailScreen(
+fun PersonWorkorderScreen(
    workorderId: UUID?,
    navController: NavController,
    viewModel: WorkordersViewModel,
 ) {        // 12345678901234567890123
-   val tag = "ok>PersonWorkDetailScr."
+   val tag = "ok>PersonWorkorderScr ."
 
 
    BackHandler(
@@ -63,7 +74,7 @@ fun PersonWorkorderDetailScreen(
    )
 
    workorderId?.let {
-      LaunchedEffect(viewModel.dbChanged) {
+      LaunchedEffect(Unit) {
          logDebug(tag, "readByIdWithPerson()")
          viewModel.readByIdWithPerson(workorderId)
       }
@@ -107,7 +118,8 @@ fun PersonWorkorderDetailScreen(
             .fillMaxWidth()
             .verticalScroll(state = rememberScrollState())
       ) {
-         viewModel.assignedPerson?.let {
+         // assigned person if state is not default
+         viewModel.workorderStateValue.person?.let { it: Person ->
             Column(modifier = Modifier.padding(bottom = 16.dp)) {
                PersonCard(
                   firstName = it.firstName,
@@ -118,59 +130,83 @@ fun PersonWorkorderDetailScreen(
                )
             }
          }
+         val focusManager: FocusManager = LocalFocusManager.current
+         val keyboardController = LocalSoftwareKeyboardController.current
 
          Text(
-            text = zonedDateTimeString(viewModel.created),
+            text = zonedDateTimeString(viewModel.workorderStateValue.created),
             modifier = Modifier
                .fillMaxWidth()
                .align(Alignment.End),
             style = MaterialTheme.typography.bodySmall,
          )
          OutlinedTextField(
-            value = viewModel.title,                          // State ↓
-            onValueChange = { viewModel.onTitleChange(it) },  // Event ↑
+            value = viewModel.workorderStateValue.title,                      // State ↓
+            onValueChange = {                                                 // Event ↑
+               viewModel.onWorkorderUiEventChange(WorkorderUiEvent.State, it) },
             modifier = Modifier.fillMaxWidth(),
-            readOnly = viewModel.state != WorkState.Default,
-            label = { Text(text = stringResource(id = R.string.title)) },
+            readOnly = viewModel.workorderStateValue.state != WorkState.Default,
+            label = { Text(stringResource(R.string.title)) },
             textStyle = MaterialTheme.typography.bodyMedium,
-            singleLine = true
+            singleLine = true,
+            keyboardOptions = KeyboardOptions.Default.copy( imeAction = ImeAction.Next ),
+            keyboardActions = KeyboardActions(
+               onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            ),
          )
          OutlinedTextField(
-            value = viewModel.description,                          // State ↓
-            onValueChange = { viewModel.onDescriptionChange(it) },  // Event ↑
+            value = viewModel.workorderStateValue.description,                // State ↓
+            onValueChange = {                                                 // Event ↑
+               viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Description, it) },
             modifier = Modifier.fillMaxWidth(),
-            readOnly = viewModel.state != WorkState.Default,
-            label = { Text(text = stringResource(id = R.string.description)) },
+            readOnly = viewModel.workorderStateValue.state != WorkState.Default,
+            label = { Text(stringResource(R.string.description)) },
             singleLine = false,
-            textStyle = MaterialTheme.typography.bodyMedium
+            textStyle = MaterialTheme.typography.bodyMedium,
+            keyboardOptions = KeyboardOptions.Default.copy( imeAction = ImeAction.Next ),
+            keyboardActions = KeyboardActions(
+               onNext = {
+                  focusManager.moveFocus(FocusDirection.Down)
+                  keyboardController?.hide()
+               }
+            ),
+
          )
-         InputStarted(
-            state = viewModel.state,
-            started = viewModel.started,
-            onStartedChange = { viewModel.onStartedChange(it) },
-            modifier = Modifier.padding(top = 8.dp)
+         InputStartWorkorder(
+            state = viewModel.workorderStateValue.state,          // State ↓
+            onStateChange = viewModel::onWorkorderUiEventChange,  // Event ↑
+            started = viewModel.workorderStateValue.started,      // State ↓
+            onStartedChange = viewModel::onWorkorderUiEventChange,// Event ↑
+            modifier = Modifier.padding(top = 8.dp)               // State ↓
          )
 
-         if (viewModel.state == WorkState.Started || viewModel.state == WorkState.Completed) {
+         if (viewModel.workorderStateValue.state == WorkState.Started ||
+             viewModel.workorderStateValue.state == WorkState.Completed) {
             OutlinedTextField(
-               value = viewModel.remark,                          // State ↓
-               onValueChange = { viewModel.onRemarkChange(it) },  // Event ↑
+               value = viewModel.workorderStateValue.remark,                  // State ↓
+               onValueChange = {                                              // Event ↑
+                  viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Remark, it) },
                modifier = Modifier.fillMaxWidth(),
                //readOnly = viewModel.state != WorkState.Started,
-               label = { Text(text = stringResource(id = R.string.remark)) },
+               label = { Text(stringResource(R.string.remark)) },
                singleLine = false,
-               textStyle = MaterialTheme.typography.bodyMedium
+               textStyle = MaterialTheme.typography.bodyMedium,
+               keyboardActions = KeyboardActions(
+                  onNext = { keyboardController?.hide() }
+               ),
             )
-            InputCompleted(
-               state = viewModel.state,
-               completed = viewModel.completed,
-               onCompletedChange = { viewModel.onCompletedChange(it) },
+            InputWorkorderCompleted(
+               state = viewModel.workorderStateValue.state,                // State ↓
+               onStateChange = viewModel::onWorkorderUiEventChange,        // Event ↑
+               completed = viewModel.workorderStateValue.completed,        // State ↓
+               onCompletedChange = viewModel::onWorkorderUiEventChange,    // Event ↑
+               onNavEvent = viewModel::onNavEvent,                         // Event ↑
             )
          }
       }
    }
 
-   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+   viewModel.errorStateValue.errorParams?.let { params: ErrorParams ->
       LaunchedEffect(params) {
          showAndRespondToError(
             errorParams = params,

@@ -10,15 +10,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.rogallab.mobile.domain.utilities.logDebug
+import de.rogallab.mobile.ui.people.PersonUiEvent
 
 @Composable
 fun SelectAndShowImage(
-   imagePath: String?,                                 // State ↓
-   onImagePathChanged: (String?) -> Unit,              // Event ↑
-
+   imagePath: String?,                                  // State ↓
+   onImagePathChanged: (PersonUiEvent, String) -> Unit  // Event ↑
 ) {
-   val tag = "ok>ContactSelectAndShow"
-   logDebug(tag,"Start")
+   val tag = "ok>SelectAndShowImage ."
 
    Row(
       modifier = Modifier
@@ -45,13 +44,17 @@ fun SelectAndShowImage(
          ) {
 
             SelectPhotoFromGallery(
-               onImagePathChanged = onImagePathChanged // Event ↑
+               onImagePathChanged = {
+                  onImagePathChanged(PersonUiEvent.ImagePath, it) // Event ↑
+              }
             )
 
             Spacer(modifier = Modifier.padding(vertical = 4.dp))
 
             TakePhotoWithCamera(
-               onImagePathChanged = onImagePathChanged // Event ↑
+               onImagePathChanged = {
+                  onImagePathChanged(PersonUiEvent.ImagePath, it) // Event ↑
+               }
             )
          }
       }

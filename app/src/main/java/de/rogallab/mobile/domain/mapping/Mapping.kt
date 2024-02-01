@@ -1,30 +1,15 @@
 package de.rogallab.mobile.domain.mapping
 
-import de.rogallab.mobile.data.models.AddressDto
 import de.rogallab.mobile.data.models.ImageDto
 import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.data.models.PersonDtoWithWorkorderDtos
 import de.rogallab.mobile.data.models.WorkorderDto
-import de.rogallab.mobile.domain.entities.Address
 import de.rogallab.mobile.domain.entities.Image
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.toZonedDateTime
 import de.rogallab.mobile.domain.utilities.toZuluString
 import java.time.Duration
-
-fun toAddress(addressDto: AddressDto): Address = Address(
-   street = addressDto.street,
-   number = addressDto.number,
-   postal = addressDto.postal,
-   city = addressDto.city
-)
-fun toAddressDto(address: Address): AddressDto = AddressDto(
-   street = address.street,
-   number = address.number,
-   postal = address.postal,
-   city = address.city
-)
 
 fun toImage(imageDto: ImageDto): Image = Image(
    contentType = imageDto.contentType,
@@ -46,6 +31,7 @@ fun toPerson(personDto:PersonDto): Person = Person(
    phone = personDto.phone,
    imagePath = personDto.imagePath,
    id = personDto.id,
+   imageId = personDto.imageId,
    workorders = mutableListOf(),
    //address = personDto.address?.let{ toAddress(it) }
 )
@@ -57,9 +43,8 @@ fun toPersonDto(person:Person): PersonDto = PersonDto(
    phone = person.phone,
    imagePath = person.imagePath,
    id = person.id,
-   //address = person.address?.let{ toAddressDto(it) }
+   imageId = person.imageId,
 )
-
 
 fun toWorkorder(workorderDto:WorkorderDto): Workorder = Workorder(
    title = workorderDto.title,
@@ -71,9 +56,7 @@ fun toWorkorder(workorderDto:WorkorderDto): Workorder = Workorder(
    duration = Duration.ofNanos(workorderDto.duration), // convert duration into nanos
    remark = workorderDto.remark,
    id = workorderDto.id,
-   person = null,
    personId = workorderDto.personId,
-   //address = workorderDto.address?.let{ toAddress(it) }
 )
 
 fun toWorkorderDto(workorder: Workorder): WorkorderDto = WorkorderDto(
@@ -87,7 +70,6 @@ fun toWorkorderDto(workorder: Workorder): WorkorderDto = WorkorderDto(
    remark = workorder.remark,
    id = workorder.id,
    personId = workorder.personId,
-   //address = this.address?.let{ toAddressDto(it) }
 )
 
 fun toPerson(personDtoWithWorkorderDtos:PersonDtoWithWorkorderDtos): Person {

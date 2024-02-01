@@ -25,13 +25,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
+import de.rogallab.mobile.domain.utilities.logError
 import de.rogallab.mobile.domain.utilities.logVerbose
 
 // https://fvilarino.medium.com/using-activity-result-contracts-in-jetpack-compose-14b179fb87de
 
 @Composable
 fun TakePhotoWithCamera(
-   onImagePathChanged: (String?) -> Unit,  // Event ↑
+   onImagePathChanged: (String) -> Unit,  // Event ↑
 ) {
    val tag = "ok>TakePhotoWithCamera."
    val context = LocalContext.current
@@ -49,8 +50,10 @@ fun TakePhotoWithCamera(
       // save bitmap to internal storage of the app
       bitmapState.value?.let { bitmap ->
          writeImageToInternalStorage(context, bitmap)?.let { uriPath: String? ->
-            logVerbose(tag, "Path $uriPath")
-            onImagePathChanged(uriPath) // Event ↑
+            uriPath?.let { it: String ->
+               logVerbose(tag, "Path $it")
+               onImagePathChanged(it)                        // Event ↑
+            } ?: logError(tag, "Storage failed")
          }
       }
    }

@@ -6,11 +6,12 @@ import androidx.room.TypeConverters
 import de.rogallab.mobile.AppStart
 import de.rogallab.mobile.data.IPeopleDao
 import de.rogallab.mobile.data.IWorkordersDao
+import de.rogallab.mobile.data.models.ImageDto
 import de.rogallab.mobile.data.models.PersonDto
 import de.rogallab.mobile.data.models.WorkorderDto
 
 @Database(
-   entities = [PersonDto::class, WorkorderDto::class],
+   entities = [PersonDto::class, WorkorderDto::class, ImageDto::class],
    version = AppStart.database_version,
    exportSchema = false
 )

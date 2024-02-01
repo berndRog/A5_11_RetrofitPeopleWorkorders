@@ -4,16 +4,18 @@ import de.rogallab.mobile.domain.utilities.as8
 import java.util.UUID
 
 data class Person (
-   var firstName: String = "",
-   var lastName: String = "",
-   var email: String? = null,
-   var phone:String? = null,
-   var imagePath: String? = null,
+   val firstName: String = "",
+   val lastName: String = "",
+   val email: String? = null,
+   val phone:String? = null,
+   // local image path
+   val imagePath: String? = null,
    val id: UUID = UUID.randomUUID(),
-   // Relation Person --> Workorder [0..*]
+   // One-to-one relation Person --> Image[0..1]
+   var imageId: UUID? = null,
+   var image: Image? = null,
+   // One-to-many Person --> Workorder [0..*]
    val workorders: MutableList<Workorder> = mutableListOf(),
-   // Embedded relation Person -> Address[0..1]
-   var address: Address? = null
 ) {
    fun asString() : String = "$firstName $lastName ${id.as8()}"
 
@@ -30,4 +32,5 @@ data class Person (
       workorder.person = null
       workorder.personId = null
    }
+
 }

@@ -1,4 +1,4 @@
-package de.rogallab.mobile.ui.people.composables
+package de.rogallab.mobile.ui.composables
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext

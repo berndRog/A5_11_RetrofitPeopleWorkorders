@@ -32,7 +32,7 @@ class WebserviceBuilder @Inject constructor(
       .build()
 
    //-- Retrofit Client -------------------------------------------------------
-   val retrofit = Retrofit.Builder()
+   val retrofit: Retrofit = Retrofit.Builder()
       .baseUrl(AppStart.base_url)
       .addConverterFactory(GsonConverterFactory.create())
       .client(okHttpClient)

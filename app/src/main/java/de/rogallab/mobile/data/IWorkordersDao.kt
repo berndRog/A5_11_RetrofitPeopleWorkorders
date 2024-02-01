@@ -27,20 +27,9 @@ interface IWorkordersDao {
    @Insert(onConflict = OnConflictStrategy.ABORT)              // One-Shot Write
    suspend fun insert(workorderDto: WorkorderDto): Long
 
-   @Insert(onConflict = OnConflictStrategy.ABORT)
-   suspend fun insertAll(workorderDtos: List<WorkorderDto>)    // One-shot write
-
    @Update(onConflict = OnConflictStrategy.ABORT)
    suspend fun update(workorderDto: WorkorderDto)              // One-Shot Write
 
-   @Delete
-   suspend fun delete(workOrderDto: WorkorderDto)              // One-Shot Write
-
-
-   @Query("SELECT * FROM workorders "
-      +   "LEFT JOIN people "
-      +   "ON   workorders.personId = people.id "
-      +   "WHERE workorders.id = :id")
-   suspend fun findByIdWithPerson(id:UUID): Map<WorkorderDto, PersonDto?>
-
+   @Query("DELETE FROM workorders WHERE id = :id")
+   suspend fun delete(id: UUID)                                // One-Shot Write
 }
