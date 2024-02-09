@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.rogallab.mobile.AppStart
 import de.rogallab.mobile.data.seed.SeedDatabase
 import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.logVerbose
@@ -31,7 +32,7 @@ class MainViewModel @Inject constructor(
    val visiblePermissionQueue: SnapshotStateList<String> = mutableStateListOf()
 
    init{
-      _seedDatabase.initDatabase()
+      if(! AppStart.isWebservice) _seedDatabase.initDatabase()
    }
 
    override fun onCleared() {

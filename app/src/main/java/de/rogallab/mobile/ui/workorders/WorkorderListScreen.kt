@@ -10,11 +10,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DismissDirection
-import androidx.compose.material3.DismissValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -25,9 +24,13 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismiss
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxDefaults
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDismissState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,7 +69,7 @@ fun WorkordersListScreen(
 
    val workordersState: WorkordersUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
    LaunchedEffect(Unit) {
-      viewModel.fetchWorkordersFromWeb() // Ensuring refresh is called at least once
+      viewModel.refreshStateFlowWorkorders() // Ensuring refresh is called at least once
    }
 
    BackHandler(
@@ -95,7 +98,7 @@ fun WorkordersListScreen(
                      }
                   }) {
                   Icon(
-                     imageVector = Icons.Default.ArrowBack,
+                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                      contentDescription = stringResource(R.string.back)
                   )
                }
@@ -150,49 +153,50 @@ fun WorkordersListScreen(
          ) {
             items(items = items) { workorder ->
                val (state, time) = evalWorkorderStateAndTime(workorder)
-               val dismissState = rememberDismissState(
-                  confirmValueChange = {
-                     if (it == DismissValue.DismissedToEnd) {
-                        navController.navigate(NavScreen.WorkorderDetail.route + "/${workorder.id}")
-                        return@rememberDismissState true
-                     } else if (it == DismissValue.DismissedToStart) {
-                        viewModel.remove(workorder.id)
-                        // undo delete
-                        val job = showUndo(
-                           coroutineScope = coroutineScope,
-                           snackbarHostState = snackbarHostState,
-                           message = "Wollen Sie den Arbeitsauftrag wirklich löschen?",
-                           t = workorder,
-                           onUndoAction = viewModel::add
-                        )
-                        coroutineScope.launch {
-                           job.join()
-                           navController.navigate(NavScreen.WorkordersList.route)
-                        }
-                        return@rememberDismissState true
-                     }
-                     return@rememberDismissState false
-                  }
-               )
 
-               SwipeToDismiss(
-                  state = dismissState,
+               val dismissBoxState: SwipeToDismissBoxState =
+                  rememberSwipeToDismissBoxState(
+                     initialValue = SwipeToDismissBoxValue.Settled,
+                     confirmValueChange = {
+                        if (it == SwipeToDismissBoxValue.StartToEnd) {
+                           navController.navigate(NavScreen.WorkorderDetail.route + "/${workorder.id}")
+                           return@rememberSwipeToDismissBoxState true
+                        } else if (it == SwipeToDismissBoxValue.EndToStart) {
+                           viewModel.remove(workorder.id)
+                           // undo delete
+                           val job = showUndo(
+                              coroutineScope = coroutineScope,
+                              snackbarHostState = snackbarHostState,
+                              message = "Wollen Sie den Arbeitsauftrag wirklich löschen?",
+                              t = workorder,
+                              onUndoAction = viewModel::add
+                           )
+                           coroutineScope.launch {
+                              job.join()
+                              navController.navigate(NavScreen.WorkordersList.route)
+                           }
+                           return@rememberSwipeToDismissBoxState true
+                        } else return@rememberSwipeToDismissBoxState false
+                     },
+                     positionalThreshold = SwipeToDismissBoxDefaults.positionalThreshold,
+                  )
+
+               SwipeToDismissBox(
+                  state = dismissBoxState,
                   modifier = Modifier.padding(vertical = 4.dp),
-                  directions = setOf(DismissDirection.StartToEnd, DismissDirection.EndToStart),
-                  background = {
-                     SetSwipeBackgroud(dismissState)
-                  },
-                  dismissContent = {
-                     Column {
-                        WorkorderCard(
-                           time = time,
-                           state = state,
-                           title = workorder.title,
-                           elevation = setCardElevation(dismissState)
-                        )
-                     }
+                  enableDismissFromStartToEnd = true,
+                  enableDismissFromEndToStart = true,
+                  backgroundContent = { SetSwipeBackgroud(dismissBoxState) }
+               ) {
+                  Column {
+                     WorkorderCard(
+                        time = time,
+                        state = state,
+                        title = workorder.title,
+                        elevation = setCardElevation(dismissBoxState)
+                     )
                   }
-               )
+               }
             } // items
          } // lazy Column
       } // state successful

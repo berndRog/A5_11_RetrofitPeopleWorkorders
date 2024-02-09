@@ -8,7 +8,7 @@ sealed class WorkorderUiEvent {
    object Created : WorkorderUiEvent()
    object Started : WorkorderUiEvent()
    object Completed : WorkorderUiEvent()
-   object Duration : WorkorderUiEvent()
+// object Duration : WorkorderUiEvent() is also calculated in Completed event
    object Remark : WorkorderUiEvent()
    object Id : WorkorderUiEvent()
    object PersonId : WorkorderUiEvent()

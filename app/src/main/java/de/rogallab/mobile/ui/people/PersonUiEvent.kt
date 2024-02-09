@@ -7,4 +7,5 @@ sealed class PersonUiEvent {
    object Email : PersonUiEvent()
    object Phone : PersonUiEvent()
    object ImagePath : PersonUiEvent()
+   object RemoteUriPath : PersonUiEvent()
 }

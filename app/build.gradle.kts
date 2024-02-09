@@ -86,12 +86,14 @@ dependencies {
    // It will greatly simplify the way you define Compose library versions in your
    // Gradle dependencies block.
    // https://developer.android.com/jetpack/compose/bom/bom-mapping
-   val compose = "1.5.4"
-   implementation(platform("androidx.compose:compose-bom:2023.10.01"))
+   val compose = "1.6.0"
+   implementation(platform("androidx.compose:compose-bom:2024.01.00"))
    implementation("androidx.compose.ui:ui")
    implementation("androidx.compose.ui:ui-graphics")
    implementation("androidx.compose.ui:ui-tooling-preview")
-   val material3 = "1.1.2"
+   implementation("androidx.compose.ui:ui-tooling")
+   // https://developer.android.com/jetpack/androidx/releases/compose-material3
+   val material3 = "1.2.0"
    implementation("androidx.compose.material3:material3:$material3")
    implementation("androidx.compose.material:material-icons-extended:$compose")
 
@@ -156,7 +158,7 @@ dependencies {
    implementation ("com.squareup.okhttp3:logging-interceptor:$retrofitInterceptors")
 
    // Google play services
-   val locationServicesVersion = "21.0.1"
+   val locationServicesVersion = "21.1.0"
    implementation ("com.google.android.gms:play-services-location:$locationServicesVersion")
 
    // OpenId OAuth
@@ -168,7 +170,7 @@ dependencies {
    // TESTS -----------------------
    testImplementation("junit:junit:4.13.2")
    //testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-   testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+   testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
    // ANDROID TESTS ---------------
    // https://developer.android.com/jetpack/androidx/releases/test
    val androidTestCore = "1.5.0"
@@ -194,10 +196,10 @@ dependencies {
    androidTestImplementation("androidx.test:runner:$runner")
 
    // To use Compose Testing
-   androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))
+   androidTestImplementation(platform("androidx.compose:compose-bom:2024.01.00"))
    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
    debugImplementation("androidx.compose.ui:ui-tooling")
-   val uiTestManifest = "1.5.4"
+   val uiTestManifest = "1.6.0"
    debugImplementation("androidx.compose.ui:ui-test-manifest:$uiTestManifest")
 
    androidTestImplementation("androidx.navigation:navigation-testing:$navigationVersion")

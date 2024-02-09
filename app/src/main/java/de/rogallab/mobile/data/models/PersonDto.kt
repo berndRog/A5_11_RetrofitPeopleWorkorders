@@ -13,6 +13,7 @@ data class PersonDto (
    var email: String? = null,
    var phone:String? = null,
    var imagePath: String? = null,
+   val remoteUriPath: String? = null,
    @PrimaryKey
    val id: UUID = UUID.randomUUID(),
    // one to one relation

@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -85,41 +84,29 @@ fun PersonScreen(
                IconButton(onClick = {
                   // Check input fields and navigate to people list or show error
                   viewModel.validateAndNavigate(isInput, charMin, charMax)
-
-               //      if (!viewModel.isValid(context, viewModel)) {
-//                     if (isInput) viewModel.add() else viewModel.update(id!!)
-//                     navController.navigate(route = NavScreen.PeopleList.route) {
-//                        popUpTo(route = NavScreen.PersonDetail.route) { inclusive = true }
-//                     }
-//                  }
                }) {
-                  Icon(
-                     imageVector = Icons.Default.ArrowBack,
-                     contentDescription = stringResource(R.string.back)
-                  )
+                  Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                     contentDescription = stringResource(R.string.back))
                }
             }
          )
       },
       snackbarHost = {
          SnackbarHost(hostState = snackbarHostState) { data ->
-            Snackbar(
-               snackbarData = data,
-               actionOnNewLine = true
-            )
+            Snackbar(snackbarData = data, actionOnNewLine = true)
          }
       }
    ) { innerPadding ->
       Column(
-         modifier = Modifier
-            .padding(paddingValues = innerPadding)
-            .padding(horizontal = 8.dp)
-            .fillMaxWidth()
-            .verticalScroll(state = rememberScrollState())
+         modifier = Modifier.padding(paddingValues = innerPadding)
+            .padding(horizontal = 8.dp).fillMaxWidth().verticalScroll(state = rememberScrollState())
       ) {
          InputName(
             firstName = viewModel.personStateValue.firstName,     // State ↓
-            onFirstNameChange = viewModel::onPersonUiEventChange, // Event ↑
+            onFirstNameChange = { event: PersonUiEvent, it: String ->
+               viewModel.onPersonUiEventChange(event, it) },        // Event ↑
+            //onFirstNameChange = viewModel::onPersonUiEventChange, // Event ↑
+            
             lastName = viewModel.personStateValue.lastName,       // State ↓
             onLastNameChange = viewModel::onPersonUiEventChange,  // Event ↑
             charMin = charMin,
@@ -134,13 +121,13 @@ fun PersonScreen(
             onPhoneChange = viewModel::onPersonUiEventChange,     // Event ↑
          )
          SelectAndShowImage(
-            imagePath = viewModel.personStateValue.imagePath,     // State ↓
+            imagePath = viewModel.getActualImagePath(),           // State ↓
             onImagePathChanged = viewModel::onPersonUiEventChange // Event ↑
          )
       }
    }
 
-   viewModel.errorState.errorParams?.let { params: ErrorParams ->
+   viewModel.errorStateValue.errorParams?.let { params: ErrorParams ->
       LaunchedEffect(params) {
          showAndRespondToError(
             errorParams = params,

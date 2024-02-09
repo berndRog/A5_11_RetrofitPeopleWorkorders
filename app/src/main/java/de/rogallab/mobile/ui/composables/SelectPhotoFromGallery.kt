@@ -51,14 +51,11 @@ fun SelectPhotoFromGallery(
                ImageDecoder.decodeBitmap(this)
             }
          }
-
          // save bitmap to internal storage of the app
          bitmap?.let { bitmap ->
             writeImageToInternalStorage(context, bitmap)?.let { uriPath:String? ->
                uriPath?.let { it: String ->
-                  logVerbose(tag, "Storage $it")
                   onImagePathChanged(it)  // Event ↑
-                  logDebug(tag, "Storage $uriPath")
                } ?: logError(tag, "Storage failed")
             }
          }

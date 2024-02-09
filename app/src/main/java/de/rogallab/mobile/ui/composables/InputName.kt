@@ -39,10 +39,10 @@ import de.rogallab.mobile.ui.base.validateNameTooShort
 fun InputName(
    firstName: String,                                    // State ↓
    onFirstNameChange: (PersonUiEvent, String) -> Unit,   // Event ↑
-   lastName: String,
-   onLastNameChange: (PersonUiEvent, String) -> Unit,
-   charMin: Int,
-   charMax: Int
+   lastName: String,                                     // State ↓
+   onLastNameChange: (PersonUiEvent, String) -> Unit,    // Event ↑
+   charMin: Int,                                         // State ↓
+   charMax: Int                                          // State ↓
 ) {
    val focusManager: FocusManager = LocalFocusManager.current
    val keyboardController = LocalSoftwareKeyboardController.current

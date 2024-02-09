@@ -51,4 +51,5 @@ sealed class ResultData<out T>(
    data class  Loading       (val loading:Boolean     ): ResultData<Nothing>(null)
    data class  Success<out T>(val data: T             ): ResultData<T>(data)
    data class  Failure       (val throwable: Throwable): ResultData<Nothing>(throwable)
+   object      Empty                                   : ResultData<Nothing>(null)
 }

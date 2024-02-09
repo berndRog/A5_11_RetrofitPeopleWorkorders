@@ -1,5 +1,4 @@
 package de.rogallab.mobile.domain.utilities
-import de.rogallab.mobile.ui.navigation.NavScreen
 import java.time.*
 import java.time.format.DateTimeFormatter
 
@@ -59,6 +58,18 @@ fun toZuluString(zdt: ZonedDateTime): String =
 fun toZonedDateTime(zulu: String): ZonedDateTime =
    ZonedDateTime.parse(zulu, formatISO)
                 .withZoneSameInstant(systemZoneId)
+
+fun toEpochMillis(
+   zdt: ZonedDateTime
+): Long =
+   zdt.toInstant().toEpochMilli()
+
+fun toZonedDateTime(
+   epochMillis: Long,
+   zoneId: ZoneId = systemZoneId
+): ZonedDateTime =
+   Instant.ofEpochMilli(epochMillis).atZone(zoneId)
+
 
 /*
    Zulu Time (Coordinated Universal Time) == UTC(GMT) +0

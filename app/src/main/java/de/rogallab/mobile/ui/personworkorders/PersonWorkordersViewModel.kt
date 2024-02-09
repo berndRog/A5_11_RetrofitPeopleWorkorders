@@ -1,4 +1,4 @@
-package de.rogallab.mobile.ui.workorders
+package de.rogallab.mobile.ui.personworkorders
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -16,12 +16,13 @@ import de.rogallab.mobile.domain.entities.Workorder
 import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
-import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.ErrorState
 import de.rogallab.mobile.ui.base.NavState
 import de.rogallab.mobile.ui.base.getWorkorderFromState
 import de.rogallab.mobile.ui.navigation.NavScreen
+import de.rogallab.mobile.ui.workorders.WorkorderUiEvent
+import de.rogallab.mobile.ui.workorders.WorkordersUiState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -45,12 +46,18 @@ import javax.inject.Inject
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class WorkordersViewModel @Inject constructor(
+class PersonWorkordersViewModel @Inject constructor(
    private val _useCases: IWorkorderUseCases,
-   private val _repository: IWorkordersRepository,
    private val _peopleRepository: IPeopleRepository,
+   private val _workordersRepository: IWorkordersRepository,
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
+
+   // Observer (DataBinding), Observable is a Person object
+   private val _personState: MutableState<Person> =  mutableStateOf(Person())
+   // access to the observable
+   val personStateValue: Person
+      get() = _personState.value  // Observable (DataBinding)
 
    // Observer (DataBinding), Observable is a Person object
    private val _workorderState: MutableState<Workorder> =  mutableStateOf(Workorder())
@@ -81,9 +88,9 @@ class WorkordersViewModel @Inject constructor(
 
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
+      showOnFailure(exception)
       exception.localizedMessage?.let { message ->
          logError(tag, message)
-        // _stateFlowError.update{ it.copy(message = message, isNavigation = false) }
       } ?: run {
          exception.stackTrace.forEach {
             logError(tag, it.toString())
@@ -94,7 +101,6 @@ class WorkordersViewModel @Inject constructor(
    private val _coroutineContext = SupervisorJob() + _dispatcher + _exceptionHandler
    // Coroutine Scope
    private val _coroutineScope = CoroutineScope(_coroutineContext)
-
    override fun onCleared() {
       // cancel all coroutines, when lifecycle of the viewmodel ends
       logDebug(tag, "Cancel all child coroutines")
@@ -106,21 +112,23 @@ class WorkordersViewModel @Inject constructor(
    //
    private var _navState: MutableState<NavState> =
       mutableStateOf(NavState(onNavRequestHandled = ::onNavEventHandled))
-   val navStateValue: NavState
-      get() =  _navState.value
+   val navState: NavState
+      get() = _navState.value
    fun onNavEvent(route: String, clearBackStack: Boolean = true) {
-      _navState.value = navStateValue.copy(route = route, clearBackStack = clearBackStack)
+      _navState.value = navState.copy(route = route, clearBackStack = clearBackStack)
    }
    fun onNavEventHandled() {
-      _navState.value = navStateValue.copy(route = null, clearBackStack = true )
+      _navState.value = navState.copy(route = null, clearBackStack = true )
    }
    //
-   // Error State = ViewModel (one time) UI event
+   // Error State = ViewModel (one time) events
    //
-   private var _errorState: MutableState<ErrorState> =
-      mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
+   // https://developer.android.com/topic/architecture/ui-layer/events#handle-viewmodel-events
+   private val _errorState: MutableState<ErrorState> 
+      = mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
    val errorStateValue: ErrorState
       get() = _errorState.value
+
    fun showOnFailure(throwable: Throwable) =
       showOnError(throwable.localizedMessage ?: "Unknown error")
    fun showOnError(errorMessage: String) {
@@ -135,8 +143,8 @@ class WorkordersViewModel @Inject constructor(
    }
    // show error and navigate back
    fun showAndNavigateBackOnFailure(throwable: Throwable) =
-      showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
-   fun showAndNavigateBackOnFailure(errorMessage: String) {
+      showAndNavigateBackOnError(throwable.localizedMessage ?: "Unknown error")
+   fun showAndNavigateBackOnError(errorMessage: String) {
       logError(tag, errorMessage)
       _errorState.value = errorStateValue.copy(
          errorParams = ErrorParams(
@@ -150,6 +158,7 @@ class WorkordersViewModel @Inject constructor(
       logDebug(tag, "onErrorEventHandled()")
       _errorState.value = errorStateValue.copy(errorParams = null)
    }
+   // error handling
    fun onErrorAction() {
       logDebug(tag, "onErrorAction()")
       // toDo
@@ -176,9 +185,9 @@ class WorkordersViewModel @Inject constructor(
                fetch.collect() { result: ResultData<List<Workorder>> ->
                   when (result) {
                      is ResultData.Loading -> emit(WorkordersUiState(isLoading = true,
-                           isSuccessful = false, workorders = emptyList()))
+                        isSuccessful = false, workorders = emptyList()))
                      is ResultData.Success -> emit(WorkordersUiState(isLoading = false,
-                           isSuccessful = true, workorders = result.data))
+                        isSuccessful = true, workorders = result.data))
                      is ResultData.Failure -> showOnFailure(result.throwable)
                      else -> Unit
                   }
@@ -196,42 +205,35 @@ class WorkordersViewModel @Inject constructor(
       _refreshTrigger.tryEmit(Unit)
    }
    //
-   // Fetch workorder by id
+   // Read person by id with workorders
    //
-   fun readById(id: UUID) {
+   fun readByIdWithWorkorders(id: UUID) {
       _coroutineScope.launch {
-         logDebug(tag,"readById(${id.as8()}) isWebservice=${AppStart.isWebservice}")
-         var result: ResultData<Workorder?>
-         if(AppStart.isWebservice) result = _repository.getById(id)
-         else                      result = _repository.findById(id)
+         logDebug(tag, "readByIdWithWorkorders(${id.as8()}) " +
+            "isWebservice=${AppStart.isWebservice}")
+
+         var result: ResultData<Person?>
+         if(AppStart.isWebservice) result = _peopleRepository.getByIdWithWorkorders(id)
+         else                      result = _peopleRepository.findByIdWithWorkorders(id)
          when (result) {
             is ResultData.Success -> {
-               result.data?.let { it: Workorder -> setStateFromWorkorder(it) }
+               result.data?.let { person: Person ->
+                  setStateFromPerson(person)
+               }
+               //onNavEvent(route = NavScreen.PeopleList.route)
             }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
    }
-   //
-   // Add workorder
-   //
-   fun add(w: Workorder? = null) {
-      val workorder: Workorder = w ?: getWorkorderFromState(workorderStateValue)
-      _coroutineScope.launch {
-         logDebug(tag,"add() isWebservice=${AppStart.isWebservice}")
-         var result: ResultData<Unit>
-         if(AppStart.isWebservice) result = _repository.post(workorder)
-         else                      result = _repository.add(workorder)
-         when (result) {
-            is ResultData.Success -> {
-               refreshStateFlowWorkorders()
-               //onNavEvent(NavScreen.PeopleList.route)
-            }
-            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
-            else -> Unit
-         }
-      }
+
+   fun assign(workorder: Workorder) {
+      personStateValue.addWorkorder(workorder)
+   }
+
+   fun unassign(workorder: Workorder) {
+      personStateValue.removeWorkorder(workorder)
    }
    //
    // Update workorder
@@ -241,89 +243,29 @@ class WorkordersViewModel @Inject constructor(
       _coroutineScope.launch {
          logDebug(tag,"update() isWebservice=${AppStart.isWebservice}")
          var result: ResultData<Unit>
-         if(AppStart.isWebservice) result = _repository.put(workorder)
-         else                      result = _repository.update(workorder)
+         if(AppStart.isWebservice) result = _workordersRepository.put(workorder)
+         else                      result = _workordersRepository.update(workorder)
          when (result) {
-            is ResultData.Success -> {
-               refreshStateFlowWorkorders()
-               route?.let { onNavEvent(route) }
-            }
-            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
-            else -> Unit
-         }
-      }
-   }
-   //
-   // Remove workorder by id
-   //
-   fun remove(id: UUID) {
-      _coroutineScope.launch {
-         logDebug(tag,"remove() isWebservice=$AppStart.isWebservice")
-         var result: ResultData<Unit>
-         if(AppStart.isWebservice) result = _repository.delete(id)
-         else                      result = _repository.remove(id)
-         when (result) {
-            is ResultData.Success ->  {
-               refreshStateFlowWorkorders()
-            }
             is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
             else -> Unit
          }
       }
    }
 
-   /*
-   fun readByIdWithPerson(id: UUID) {
-      _coroutineScope.launch {
-         logDebug(tag,"readByIdWithPerson(${id.as8()}) isWebservice=$isWebservice")
-         // read workorder
-         var resultWorkorder: ResultData<Workorder?>
-         if(isWebservice) resultWorkorder = _repository.getById(id)
-         else             resultWorkorder = _repository.findById(id)
-         when (resultWorkorder) {
-            is ResultData.Failure -> showAndNavigateBackOnFailure(resultWorkorder.throwable)
-            is ResultData.Success -> {
-               if(resultWorkorder.data == null) {
-                  showAndNavigateBackOnFailure("Workorder not found")
-                  return@launch
-               }
-               val workorder: Workorder = resultWorkorder.data!!
-               setStateFromWorkorder(workorder)
-               workorder.personId?.let { personId ->
-                  // read assigned person
-                  val resultPerson: ResultData<Person?>
-                  if(isWebservice) resultPerson = _peopleRepository.getById(personId)
-                  else             resultPerson = _peopleRepository.findById(personId)
-                  when (resultPerson) {
-                     is ResultData.Success -> {
-                        // set assigned person
-                       _workorderState.value =
-                          workorderStateValue.copy(person = resultPerson.data)
-                     }
-                     is ResultData.Failure -> showAndNavigateBackOnFailure(resultPerson.throwable)
-                     else -> Unit
-                  }
-               }
-            }
-            else -> Unit
-         }
-      }
-   }
-   */
-
-   fun clearState() {
-      logDebug(tag, "clearState")
-      _workorderState.value = Workorder()
-      _workorderState.value = workorderStateValue.copy(created = zonedDateTimeNow())
-      onNavEvent(route = NavScreen.WorkorderInput.route, clearBackStack = false)
+   fun getImagePath(): String? {
+      if(personStateValue.imagePath == null && personStateValue.remoteUriPath != null)
+         return personStateValue.remoteUriPath
+      else if(personStateValue.imagePath != null && personStateValue.remoteUriPath == null)
+         return personStateValue.imagePath
+      else return null
    }
 
-   private fun setStateFromWorkorder(workorder: Workorder) {
-      _workorderState.value = workorder.copy()
+   private fun setStateFromPerson(person: Person) {
+      _personState.value = person.copy()
    }
+
 
    companion object {
-      //12345678901234567890123
-      private const val tag = "ok>WorkordersViewModel."
+      private const val tag = "ok>PeopleViewModel    ."
    }
 }

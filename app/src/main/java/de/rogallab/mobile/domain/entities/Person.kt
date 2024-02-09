@@ -1,6 +1,7 @@
 package de.rogallab.mobile.domain.entities
 
 import de.rogallab.mobile.domain.utilities.as8
+import de.rogallab.mobile.domain.utilities.getLocalOrRemoteImagePath
 import java.util.UUID
 
 data class Person (
@@ -10,6 +11,7 @@ data class Person (
    val phone:String? = null,
    // local image path
    val imagePath: String? = null,
+   val remoteUriPath: String? = null,
    val id: UUID = UUID.randomUUID(),
    // One-to-one relation Person --> Image[0..1]
    var imageId: UUID? = null,
@@ -18,6 +20,9 @@ data class Person (
    val workorders: MutableList<Workorder> = mutableListOf(),
 ) {
    fun asString() : String = "$firstName $lastName ${id.as8()}"
+
+   fun getActualImagePath(): String? =
+      getLocalOrRemoteImagePath(imagePath, remoteUriPath)
 
    fun addWorkorder(workorder: Workorder) {
       workorder.state = WorkState.Assigned

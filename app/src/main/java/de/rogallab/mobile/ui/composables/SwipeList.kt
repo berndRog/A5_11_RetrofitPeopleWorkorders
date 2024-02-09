@@ -10,11 +10,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DismissDirection
-import androidx.compose.material3.DismissState
-import androidx.compose.material3.DismissValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,10 +24,10 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun SetSwipeBackgroud(dismissState: DismissState) {
+fun SetSwipeBackgroud(dismissBoxState: SwipeToDismissBoxState) {
 
    val (colorBox, colorIcon, alignment, icon, description, scale) =
-      determineSwipeProperties(dismissState)
+      determineSwipeProperties(dismissBoxState)
 
    Box(
       Modifier
@@ -52,39 +51,39 @@ fun SetSwipeBackgroud(dismissState: DismissState) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun determineSwipeProperties(
-   dismissState: DismissState
+   dismissBoxState: SwipeToDismissBoxState
 ): SwipeProperties {
 
-   val colorBox: Color = when (dismissState.targetValue) {
-      DismissValue.Default -> Color.LightGray
-      DismissValue.DismissedToEnd -> Color.Green
-      DismissValue.DismissedToStart -> Color.Red
+   val colorBox: Color = when (dismissBoxState.targetValue) {
+      SwipeToDismissBoxValue.Settled -> Color.LightGray
+      SwipeToDismissBoxValue.StartToEnd -> Color.Green    // move to right
+      SwipeToDismissBoxValue.EndToStart -> Color.Red      // move to left
    }
 
-   val colorIcon: Color = when (dismissState.targetValue) {
-      DismissValue.Default -> Color.Black
+   val colorIcon: Color = when (dismissBoxState.targetValue) {
+      SwipeToDismissBoxValue.Settled -> Color.Black
       else -> Color.DarkGray
    }
 
-   val alignment: Alignment = when (dismissState.dismissDirection) {
-      DismissDirection.StartToEnd -> Alignment.CenterStart
-      DismissDirection.EndToStart -> Alignment.CenterEnd
+   val alignment: Alignment = when (dismissBoxState.dismissDirection) {
+      SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+      SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
       else -> Alignment.Center
    }
 
-   val icon: ImageVector = when (dismissState.dismissDirection) {
-      DismissDirection.StartToEnd -> Icons.Default.Edit
-      DismissDirection.EndToStart -> Icons.Default.Delete
+   val icon: ImageVector = when (dismissBoxState.dismissDirection) {
+      SwipeToDismissBoxValue.StartToEnd -> Icons.Default.Edit   // left
+      SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete // right
       else -> Icons.Default.Info
    }
 
-   val description: String = when (dismissState.dismissDirection) {
-      DismissDirection.StartToEnd -> "Editieren"
-      DismissDirection.EndToStart -> "Löschen"
+   val description: String = when (dismissBoxState.dismissDirection) {
+      SwipeToDismissBoxValue.StartToEnd -> "Editieren"
+      SwipeToDismissBoxValue.EndToStart -> "Löschen"
       else -> "Unknown Action"
    }
 
-   val scale = if (dismissState.targetValue == DismissValue.Default)
+   val scale = if (dismissBoxState.targetValue == SwipeToDismissBoxValue.Settled)
       1.25f else 1.5f
 
    return SwipeProperties(
@@ -103,13 +102,13 @@ data class SwipeProperties(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun setCardElevation(dismissState: DismissState) =
+fun setCardElevation(dismissBoxState: SwipeToDismissBoxState) =
    CardDefaults.cardElevation(
-      defaultElevation = 4.dp,
-      pressedElevation = if (dismissState.dismissDirection != null) 8.dp else 4.dp,
-      focusedElevation = if (dismissState.dismissDirection != null) 8.dp else 4.dp,
-      hoveredElevation = 4.dp,
-      draggedElevation = if (dismissState.dismissDirection != null) 8.dp else 4.dp,
+      defaultElevation = 8.dp,
+      pressedElevation =  8.dp,
+      focusedElevation =  8.dp,
+      hoveredElevation = 8.dp,
+      draggedElevation =  8.dp,
       disabledElevation = 0.dp
    )
 

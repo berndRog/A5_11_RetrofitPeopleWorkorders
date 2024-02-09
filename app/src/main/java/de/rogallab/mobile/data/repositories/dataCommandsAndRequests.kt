@@ -1,5 +1,6 @@
 package de.rogallab.mobile.data.repositories
 
+/*
 import de.rogallab.mobile.data.network.httpStatusMessage
 import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.utilities.logDebug
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import okio.IOException
 import retrofit2.Response
+
 
 // T = Entity
 // R = Dto
@@ -136,3 +138,5 @@ suspend fun <T, R> apiCommandRequest(
       return ResultData.Failure(t)
    }
 }
+
+ */

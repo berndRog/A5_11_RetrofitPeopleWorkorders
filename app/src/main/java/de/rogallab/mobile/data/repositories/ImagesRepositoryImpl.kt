@@ -44,6 +44,21 @@ class ImagesRepositoryImpl @Inject constructor(
          }
       }
 
+   override suspend fun delete(id: UUID): ResultData<Unit> =
+      withContext(_dispatcher) {
+         try {
+            // delete the imageDto and the file with the remoteUriPath
+            val response: Response<Unit> = _service.delete(id)
+            if (response.isSuccessful)
+               return@withContext ResultData.Success(Unit)
+            else
+               return@withContext ResultData.Failure(
+                  IOException("${httpStatusMessage(response.code())}"))
+         } catch (t: Throwable) {
+            ResultData.Failure(t)
+         }
+      }
+
 
    override suspend fun existsFileName(fileName: String): ResultData<Boolean> =
       withContext(_dispatcher ) {
@@ -95,15 +110,15 @@ class ImagesRepositoryImpl @Inject constructor(
       }
 
    override suspend fun put(
-      fileName: String,         // remote file name on the webserver
-      localImagePath: String    // local file path
+      localImagePath: String,    // local file path
+      remoteUriPath: String      // remote file path
    ): ResultData<Image> = withContext(_dispatcher ) {
          try {
             createMultiPartBody(localImagePath).let { result ->
                if(result is ResultData.Failure) return@withContext result
 
                val body = (result as ResultData.Success).data
-               val response: Response<ImageDto> = _service.update(fileName, body)
+               val response: Response<ImageDto> = _service.update(remoteUriPath, body)
 
                if (response.isSuccessful) {
                   // Handle the successful response

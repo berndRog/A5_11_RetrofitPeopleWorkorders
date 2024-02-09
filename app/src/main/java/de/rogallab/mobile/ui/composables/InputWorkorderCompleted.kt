@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,28 +33,33 @@ fun InputWorkorderCompleted(
    onStateChange: (WorkorderUiEvent, WorkState) -> Unit,          // Event ↑
    completed: ZonedDateTime,                                      // State ↓
    onCompletedChange: (WorkorderUiEvent, ZonedDateTime) -> Unit,  // Event ↑
+   onUpdate: () -> Unit,                                          // Event ↑
    onNavEvent: (String, Boolean) -> Unit,                         // Event ↑
    modifier: Modifier = Modifier                                  // State ↓
 ) {
             //12345678901234567890123
-   val tag = "ok>InputCompleted     ."
-
-   var actualCompleted by rememberSaveable { mutableStateOf(value = zonedDateTimeNow()) }
+   val tag = "ok>InputWorkOCompleted."
 
    Column(modifier = modifier) {
       Row(
+         modifier = modifier.padding(top = 8.dp),
          horizontalArrangement = Arrangement.Absolute.Right,
          verticalAlignment = Alignment.CenterVertically
       ) {
-         val isWorkInProgress = state == WorkState.Started &&
-                                state != WorkState.Completed
-         if(isWorkInProgress)
-            LaunchedEffect(key1 = actualCompleted) {
+
+         // State to hold the completion time
+         var actualCompleted: ZonedDateTime by remember { mutableStateOf(completed) }
+         // State to control the timer
+         var isTimerRunning by remember { mutableStateOf(false) }
+         if(state == WorkState.Started) isTimerRunning = true
+
+         LaunchedEffect(isTimerRunning) {
+            while (isTimerRunning) {
                delay(1000)
+               // update the actualCompleted time
                actualCompleted = zonedDateTimeNow()
             }
-         else
-            actualCompleted = completed
+         }
 
          Text(
             text = zonedDateTimeString(actualCompleted),
@@ -63,9 +69,11 @@ fun InputWorkorderCompleted(
          FilledTonalButton(
             onClick = {
                logDebug(tag,"Completed clicked ${zonedDateTimeString(actualCompleted)}")
+               isTimerRunning = false
+               onCompletedChange(WorkorderUiEvent.Completed, actualCompleted) // duration is handled too
                onStateChange(WorkorderUiEvent.State, WorkState.Completed)
-               onCompletedChange(WorkorderUiEvent.Started, actualCompleted)
-               onNavEvent(NavScreen.PeopleList.route, true)
+               onUpdate()                                   // update the workorder
+               onNavEvent(NavScreen.PeopleList.route, true) // navigate back to PeopleList
             },
             enabled = state == WorkState.Started,
             modifier = Modifier.padding(end = 4.dp).weight(0.4f)

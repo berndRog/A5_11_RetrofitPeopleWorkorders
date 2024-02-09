@@ -1,5 +1,6 @@
 package de.rogallab.mobile.data
 
+import androidx.room.Query
 import de.rogallab.mobile.data.models.ImageDto
 import okhttp3.MultipartBody
 import retrofit2.Response
@@ -14,6 +15,7 @@ import java.io.File
 import java.util.UUID
 
 interface ImagesWebservice {
+
    @GET("workmanagerapi/v1/images/{id}")
    suspend fun getById(
       @Path("id") id: UUID,
@@ -23,6 +25,11 @@ interface ImagesWebservice {
    suspend fun existsFileName(
       @Path("fileName") fileName: String,
    ): Response<Boolean>
+
+   @DELETE("workmanagerapi/v1/images/{id}")
+   suspend fun delete(
+      @Path("id") id: UUID
+   ): Response<Unit>
 
 //   Endpint is used by Coil directly
 //   @GET("workmanagerapi/v1/imageFiles/{fileName}")

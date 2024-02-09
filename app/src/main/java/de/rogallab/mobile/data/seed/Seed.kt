@@ -6,6 +6,7 @@ import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.appcompat.app.AppCompatActivity
+import de.rogallab.mobile.AppStart
 import de.rogallab.mobile.R
 import de.rogallab.mobile.data.io.deleteFileOnInternalStorage
 import de.rogallab.mobile.data.io.writeImageToInternalStorage
@@ -53,24 +54,26 @@ class Seed @Inject constructor(
    var workorder06: Workorder = Workorder()
 
    init {
-      imagesUri = initializeImages()
-      people = initializePeople(imagesUri)
-      workorders = initializeWorkorders()
 
-      person01 = people[0]
-      person02 = people[1]
-      person03 = people[2]
-      person04 = people[3]
-      person05 = people[4]
-      person06 = people[5]
+      if(AppStart.isWebservice) {
+         imagesUri = initializeImages()
+         people = initializePeople(imagesUri)
+         workorders = initializeWorkorders()
 
-      workorder01 = workorders[0]
-      workorder02 = workorders[1]
-      workorder03 = workorders[2]
-      workorder04 = workorders[3]
-      workorder05 = workorders[4]
-      workorder06 = workorders[5]
+         person01 = people[0]
+         person02 = people[1]
+         person03 = people[2]
+         person04 = people[3]
+         person05 = people[4]
+         person06 = people[5]
 
+         workorder01 = workorders[0]
+         workorder02 = workorders[1]
+         workorder03 = workorders[2]
+         workorder04 = workorders[3]
+         workorder05 = workorders[4]
+         workorder06 = workorders[5]
+      }
    }
 
    private fun initializeImages(): List<String> {
@@ -126,7 +129,7 @@ class Seed @Inject constructor(
                "${Random.nextInt(100, 999)}-" +
                "${Random.nextInt(10, 9999)}"
 
-         val person = Person(firstName, lastName, email, phone, null, id)
+         val person = Person(firstName, lastName, email, phone, null, null, id)
          people.add(person)
       }
       val person = Person(

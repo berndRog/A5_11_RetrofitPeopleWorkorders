@@ -24,29 +24,24 @@ class MainActivity : BaseActivity(tag) {
 
    override fun onCreate(savedInstanceState: Bundle?) {
       super.onCreate(savedInstanceState)
-
       // use insets to show to snackbar above ime keyboard
-      WindowCompat.setDecorFitsSystemWindows(window, false)
+      window?.let {
+         WindowCompat.setDecorFitsSystemWindows(it, false)
+      }
 
       setContent {
 
          AppTheme {
             Surface(modifier = Modifier
                .fillMaxSize()
-               .safeDrawingPadding())
-            {
-               //listPermissionGroups()
+               .safeDrawingPadding()
+            ) {
                RequestPermissions()
-
               //openIdOAuthService(_authService, applicationContext)
-
-
-
-
                AppNavHost()
-
             }
          }
+
       }
    }
 

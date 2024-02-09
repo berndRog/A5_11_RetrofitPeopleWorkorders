@@ -15,6 +15,12 @@ fun readImageFromInternalStorage(uri: Uri): Bitmap? {
    }
 }
 
+fun exitsFileOnInternalStorage(fileName: String): Boolean =
+   File(fileName).exists()
+
+fun getFileEpochMillis(fileName: String): Long? =
+   File(fileName).lastModified()
+
 fun writeImageToInternalStorage(context: Context, bitmap: Bitmap): String? {
 // .../app_images/...
    val images: File = context.getDir("images", Context.MODE_PRIVATE)

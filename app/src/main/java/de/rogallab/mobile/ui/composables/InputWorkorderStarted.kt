@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -30,34 +31,42 @@ fun InputStartWorkorder(
    onStateChange: (WorkorderUiEvent, WorkState) -> Unit,       // Event ↑
    started: ZonedDateTime,                                     // State ↓
    onStartedChange: (WorkorderUiEvent, ZonedDateTime) -> Unit, // Event ↑
+   onUpdate: () -> Unit,                                       // Event ↑
    modifier: Modifier = Modifier                               // State ↓
 ) {
    //12345678901234567890123
    val tag = "ok>InputStarted       ."
-   var actualStart by rememberSaveable { mutableStateOf(value = zonedDateTimeNow()) }
 
    Column(modifier = modifier) {
       Row(
          horizontalArrangement = Arrangement.Absolute.Right,
          verticalAlignment = Alignment.CenterVertically
       ) {
-         if (state == WorkState.Started)
-            actualStart = started
-         else
-            LaunchedEffect(key1 = actualStart) {
+         // State to hold the completion time
+         var actualStart: ZonedDateTime by remember { mutableStateOf(started) }
+         // State to control the timer
+         var isTimerRunning by remember { mutableStateOf(false) }
+         if(state == WorkState.Assigned) isTimerRunning = true
+
+         LaunchedEffect(isTimerRunning) {
+            while (isTimerRunning) {
                delay(1000)
                actualStart = zonedDateTimeNow()
             }
+         }
 
          Text(
             text = zonedDateTimeString(actualStart),
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 4.dp).weight(0.6f)
+            modifier = Modifier
+               .padding(start = 4.dp).weight(0.6f)
          )
          FilledTonalButton(
             onClick = {
-               onStateChange(WorkorderUiEvent.State, WorkState.Started)
+               isTimerRunning = false
                onStartedChange(WorkorderUiEvent.Started, actualStart)  // state = started
+               onStateChange(WorkorderUiEvent.State, WorkState.Started)
+               onUpdate()
                logDebug(tag, "Start clicked ${zonedDateTimeString(actualStart)}")
             },
             enabled = state == WorkState.Assigned,

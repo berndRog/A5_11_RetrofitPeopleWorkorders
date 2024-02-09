@@ -1,4 +1,4 @@
-package de.rogallab.mobile.ui.people
+package de.rogallab.mobile.ui.personworkorders
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
@@ -9,7 +9,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,13 +44,11 @@ import de.rogallab.mobile.domain.utilities.logInfo
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
-import de.rogallab.mobile.ui.base.validateName
-import de.rogallab.mobile.ui.composables.InputWorkorderCompleted
 import de.rogallab.mobile.ui.composables.InputStartWorkorder
+import de.rogallab.mobile.ui.composables.InputWorkorderCompleted
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.workorders.WorkorderUiEvent
-import de.rogallab.mobile.ui.workorders.WorkordersViewModel
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
@@ -58,7 +56,7 @@ import java.util.UUID
 fun PersonWorkorderScreen(
    workorderId: UUID?,
    navController: NavController,
-   viewModel: WorkordersViewModel,
+   viewModel: PersonWorkordersViewModel,
 ) {        // 12345678901234567890123
    val tag = "ok>PersonWorkorderScr ."
 
@@ -76,7 +74,7 @@ fun PersonWorkorderScreen(
    workorderId?.let {
       LaunchedEffect(Unit) {
          logDebug(tag, "readByIdWithPerson()")
-         viewModel.readByIdWithPerson(workorderId)
+         viewModel.readByIdWithWorkorders(workorderId)
       }
    } ?: run {
       //viewModel.onTriggerErrorEvent("No id for person is given", true)
@@ -95,7 +93,7 @@ fun PersonWorkorderScreen(
                   }
                }) {
                   Icon(
-                     imageVector = Icons.Default.ArrowBack,
+                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                      contentDescription = stringResource(R.string.back)
                   )
                }
@@ -126,7 +124,7 @@ fun PersonWorkorderScreen(
                   lastName = it.lastName,
                   email = it.email,
                   phone = it.phone,
-                  imagePath = it.imagePath
+                  imagePath = it.getActualImagePath()
                )
             }
          }
@@ -177,6 +175,7 @@ fun PersonWorkorderScreen(
             onStateChange = viewModel::onWorkorderUiEventChange,  // Event ↑
             started = viewModel.workorderStateValue.started,      // State ↓
             onStartedChange = viewModel::onWorkorderUiEventChange,// Event ↑
+            onUpdate = viewModel::update,                         // Event ↑
             modifier = Modifier.padding(top = 8.dp)               // State ↓
          )
 
@@ -187,7 +186,7 @@ fun PersonWorkorderScreen(
                onValueChange = {                                              // Event ↑
                   viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Remark, it) },
                modifier = Modifier.fillMaxWidth(),
-               //readOnly = viewModel.state != WorkState.Started,
+               readOnly = viewModel.workorderStateValue.state != WorkState.Started,
                label = { Text(stringResource(R.string.remark)) },
                singleLine = false,
                textStyle = MaterialTheme.typography.bodyMedium,
@@ -200,6 +199,7 @@ fun PersonWorkorderScreen(
                onStateChange = viewModel::onWorkorderUiEventChange,        // Event ↑
                completed = viewModel.workorderStateValue.completed,        // State ↓
                onCompletedChange = viewModel::onWorkorderUiEventChange,    // Event ↑
+               onUpdate = viewModel::update,                               // Event ↑
                onNavEvent = viewModel::onNavEvent,                         // Event ↑
             )
          }

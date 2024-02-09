@@ -1,5 +1,6 @@
 package de.rogallab.mobile.domain.entities
 import de.rogallab.mobile.domain.utilities.as8
+import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.domain.utilities.zonedDtMin
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 import java.time.Duration
@@ -11,7 +12,7 @@ data class Workorder(
    var description: String = "",
    var imagePath: String? = null,
    var state: WorkState = WorkState.Default,
-   var created: ZonedDateTime = zonedDtMin,
+   var created: ZonedDateTime = zonedDateTimeNow(),
    var started: ZonedDateTime = zonedDtMin,
    var completed: ZonedDateTime = zonedDtMin,
    var duration:Duration = Duration.ofMillis(0),

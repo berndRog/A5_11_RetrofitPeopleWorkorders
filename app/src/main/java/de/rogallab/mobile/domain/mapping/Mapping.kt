@@ -12,16 +12,19 @@ import de.rogallab.mobile.domain.utilities.toZuluString
 import java.time.Duration
 
 fun toImage(imageDto: ImageDto): Image = Image(
-   contentType = imageDto.contentType,
    remoteUriPath = imageDto.remoteUriPath,
+   contentType = imageDto.contentType,
+   updated = toZonedDateTime(imageDto.updated),
+   id = imageDto.id,
    userId = imageDto.userId,
-   id = imageDto.id
+
 )
 fun toImageDto(image: Image): ImageDto = ImageDto(
    contentType = image.contentType,
    remoteUriPath = image.remoteUriPath,
+   updated = toZuluString(image.updated),
+   id = image.id,
    userId = image.userId,
-   id = image.id
 )
 
 fun toPerson(personDto:PersonDto): Person = Person(
@@ -30,6 +33,7 @@ fun toPerson(personDto:PersonDto): Person = Person(
    email = personDto.email,
    phone = personDto.phone,
    imagePath = personDto.imagePath,
+   remoteUriPath = personDto.remoteUriPath,
    id = personDto.id,
    imageId = personDto.imageId,
    workorders = mutableListOf(),
@@ -42,6 +46,7 @@ fun toPersonDto(person:Person): PersonDto = PersonDto(
    email = person.email,
    phone = person.phone,
    imagePath = person.imagePath,
+   remoteUriPath = person.remoteUriPath,
    id = person.id,
    imageId = person.imageId,
 )

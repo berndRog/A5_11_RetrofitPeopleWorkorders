@@ -20,8 +20,11 @@ class AppStart : Application() {
       const val isInfo = true
       const val isDebug = true
       const val isVerbose = true
+
       const val database_name:    String = "Workmanager.db"
       const val database_version: Int    = 1
+
+      const val isWebservice = true
 //    const val base_url: String = "http://10.0.2.2:5010/"
       const val base_url: String = "http://192.168.178.23:5010/"
       const val api_key:  String = ""

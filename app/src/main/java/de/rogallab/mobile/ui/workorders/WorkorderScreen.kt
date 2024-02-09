@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -38,7 +38,6 @@ import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logInfo
-import de.rogallab.mobile.domain.utilities.zonedDateTimeNow
 import de.rogallab.mobile.domain.utilities.zonedDateTimeString
 import de.rogallab.mobile.ui.base.ErrorParams
 import de.rogallab.mobile.ui.base.showAndRespondToError
@@ -58,7 +57,6 @@ fun WorkorderScreen(
           // 12345678901234567890123
    var tag = "ok>WorkorderInputScr  ."
    val isInput:Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
-
 
    if (! isInput) {
       tag = "ok>WorkorderDetailScr ."
@@ -99,7 +97,7 @@ fun WorkorderScreen(
 
                }) {
                   Icon(
-                     imageVector = Icons.Default.ArrowBack,
+                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                      contentDescription = stringResource(R.string.back)
                   )
                }
@@ -126,12 +124,13 @@ fun WorkorderScreen(
       ) {
 
          if(isInput) {
-            viewModel.onWorkorderUiEventChange(WorkorderUiEvent.Created, zonedDateTimeNow())
 
             Column(modifier = Modifier.padding(top = 8.dp)) {
                Text(
                   text = zonedDateTimeString(viewModel.workorderStateValue.created),   // State ↓
-                  modifier = Modifier.fillMaxWidth().align(Alignment.End),
+                  modifier = Modifier
+                     .fillMaxWidth()
+                     .align(Alignment.End),
                   style = MaterialTheme.typography.bodySmall,
                )
                OutlinedTextField(
@@ -163,14 +162,16 @@ fun WorkorderScreen(
                      lastName = it.lastName,
                      email = it.email,
                      phone = it.phone,
-                     imagePath = it.imagePath
+                     imagePath = it.getActualImagePath()
                   )
                }
             }
 
             Text(
                text = zonedDateTimeString(viewModel.workorderStateValue.created),   // State ↓
-               modifier = Modifier.fillMaxWidth().align(Alignment.End),
+               modifier = Modifier
+                  .fillMaxWidth()
+                  .align(Alignment.End),
                style = MaterialTheme.typography.bodySmall,
             )
             OutlinedTextField(
@@ -204,12 +205,16 @@ fun WorkorderScreen(
                   Text(
                      text = time,
                      style = MaterialTheme.typography.bodyMedium,
-                     modifier = Modifier.padding(start = 4.dp).weight(0.6f)
+                     modifier = Modifier
+                        .padding(start = 4.dp)
+                        .weight(0.6f)
                   )
                   FilledTonalButton(
                      onClick = {},
                      enabled = false,
-                     modifier = Modifier.padding(end = 4.dp).weight(0.4f)
+                     modifier = Modifier
+                        .padding(end = 4.dp)
+                        .weight(0.4f)
                   ) {
                      Text(
                         text = state,

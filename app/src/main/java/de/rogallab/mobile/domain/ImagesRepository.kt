@@ -1,5 +1,6 @@
 package de.rogallab.mobile.domain
 
+import androidx.room.Query
 import de.rogallab.mobile.domain.entities.Image
 import retrofit2.http.DELETE
 import java.io.File
@@ -11,6 +12,9 @@ interface ImagesRepository {
 
    //@GET("/images/{fileName}")
    suspend fun existsFileName(fileName: String): ResultData<Boolean>
+
+   //@DELETE("/images/{id}")
+   suspend fun delete(id: UUID): ResultData<Unit>
 
    // @POST("/imageFiles")
    suspend fun post(localImagePath: String): ResultData<Image>
