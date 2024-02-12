@@ -44,14 +44,10 @@ interface ImagesWebservice {
    ): Response<ImageDto>
 
    @Multipart
-   @PUT("workmanagerapi/v1/imageFiles/{fileName}")
+   @PUT("workmanagerapi/v1/imageFiles/{uriPath}")
    suspend fun update(
-      @Path("fileName") fileName: String,
+      @Path("uriPath") uriPath: String,
       @Part file: MultipartBody.Part
    ): Response<ImageDto>
-   
-   @DELETE("workmanagerapi/v1/imageFiles/{fileName}")
-   suspend fun delete(
-      @Path("fileName") fileName: String,
-   ): Response<ImageDto>
+
 }

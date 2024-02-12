@@ -18,8 +18,8 @@ import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.ui.people.PeopleListScreen
 import de.rogallab.mobile.ui.people.PeopleViewModel
 import de.rogallab.mobile.ui.people.PersonScreen
-import de.rogallab.mobile.ui.personworkorders.PersonWorkorderScreen
 import de.rogallab.mobile.ui.personworkorders.PersonWorkorderOverviewScreen
+import de.rogallab.mobile.ui.personworkorders.PersonWorkorderScreen
 import de.rogallab.mobile.ui.personworkorders.PersonWorkordersViewModel
 import de.rogallab.mobile.ui.workorders.WorkorderScreen
 import de.rogallab.mobile.ui.workorders.WorkordersListScreen

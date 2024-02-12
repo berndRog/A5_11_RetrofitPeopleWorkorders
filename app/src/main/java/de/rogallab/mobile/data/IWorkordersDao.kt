@@ -23,6 +23,14 @@ interface IWorkordersDao {
    @Query("SELECT COUNT(*) FROM workorders")                   // One-Shot Read
    suspend fun count(): Int
 
+   @Query(
+      "SELECT * "
+      +"FROM people "
+      +"   JOIN workorders ON people.id = workorders.personId "
+      +"WHERE WorkOrders.id = :id"
+      +"   LIMIT  1")           // One-Shot Read
+   suspend fun findByIdWithPerson(id: UUID): Map<WorkorderDto, PersonDto?>
+
    // COMMANDS --------------------------------------------
    @Insert(onConflict = OnConflictStrategy.ABORT)              // One-Shot Write
    suspend fun insert(workorderDto: WorkorderDto): Long

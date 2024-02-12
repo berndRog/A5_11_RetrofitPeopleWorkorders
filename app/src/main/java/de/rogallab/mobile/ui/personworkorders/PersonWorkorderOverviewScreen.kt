@@ -51,7 +51,6 @@ import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.composables.SetSwipeBackgroud
 import de.rogallab.mobile.ui.composables.WorkorderCard
 import de.rogallab.mobile.ui.composables.evalWorkorderStateAndTime
-import de.rogallab.mobile.ui.composables.setCardElevation
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.workorders.WorkordersUiState
 import java.util.UUID
@@ -70,12 +69,13 @@ fun PersonWorkorderOverviewScreen(
    }
 
    val personId: UUID by rememberSaveable { mutableStateOf(id!!)  }
-   val toggleRead: MutableState<Boolean> = remember { mutableStateOf(true) }
+
 
    // readbyId is called when toggleRead is changed
+   val toggleRead: MutableState<Boolean> = remember { mutableStateOf(true) }
    LaunchedEffect(toggleRead.value) {
       logDebug(tag, "ReadById(${personId.as8()})")
-      viewModel.readByIdWithWorkorders(personId)
+      viewModel.readPersonByIdWithWorkorders(personId)
    }
 
    val workorderState: WorkordersUiState by viewModel.stateFlowWorkorders.collectAsStateWithLifecycle()
@@ -252,44 +252,6 @@ private fun AssignedWorkorders(
       ) {
          items(items = assignedWorkorders) { workorder ->
             val (state, time) = evalWorkorderStateAndTime(workorder)
-//         val dismissState = rememberDismissState(
-//               confirmValueChange = {
-//                  if (it == DismissValue.DismissedToEnd) {
-//                     navController.navigate(NavScreen.PersonWorkorderDetail.route + "/${workorder.id}")
-//                     true
-//                  } else if (it == DismissValue.DismissedToStart) {
-//                     if(workorder.state != WorkState.Started &&
-//                        workorder.state != WorkState.Completed)   {
-//                        // unassign the workorder from the person
-//                        // set the workorder to default
-//                        // update the workorder in the database
-//                        onUnAssignWorkorder(workorder)
-//                        navController.navigate(NavScreen.PersonWorkorderOverview.route + "/$personId")
-//                        return@rememberDismissState true
-//                     }
-//                     return@rememberDismissState false
-//                  }
-//                  else return@rememberDismissState false
-//               }
-//            )
-//            SwipeToDismiss(
-//               state = dismissState,
-//               modifier = Modifier.padding(vertical = 4.dp),
-//               directions = setOf(DismissDirection.StartToEnd, DismissDirection.EndToStart),
-//               background = {
-//                  SetSwipeBackgroud(dismissState)
-//               },
-//               dismissContent = {
-//                  Column {
-//                     WorkorderCard(
-//                        time = time,
-//                        state = state,
-//                        title = workorder.title,
-//                        elevation = setCardElevation(dismissState)
-//                     )
-//                  }
-//               }
-//            )
 
             val dismissBoxState: SwipeToDismissBoxState =
                rememberSwipeToDismissBoxState(
@@ -326,8 +288,7 @@ private fun AssignedWorkorders(
                   WorkorderCard(
                      time = time,
                      state = state,
-                     title = workorder.title,
-                     elevation = setCardElevation(dismissBoxState)
+                     title = workorder.title
                   )
                }
             }

@@ -118,6 +118,20 @@ class WordordersRepositoryImpl @Inject constructor(
          }
       }
 
+   override suspend fun findByIdWithPerson(id: UUID): ResultData<Map<Workorder, Person?>> =
+      withContext(_dispatcher) {
+         try {
+            val map: Map<WorkorderDto, PersonDto?> = _dao.findByIdWithPerson(id)
+            val workorder: Workorder = toWorkorder(map.keys.first())
+            val person: Person? = map.values.first()?.let { it: PersonDto ->
+               toPerson(it)} ?: null
+            val result: Map<Workorder, Person?> = mapOf(workorder to person)
+            return@withContext ResultData.Success(result)
+         } catch (t: Throwable) {
+            return@withContext ResultData.Failure(t)
+         }
+      }
+
 
    // W E B S E R V I C E
    override fun getAll(): Flow<ResultData<List<Workorder>>> = flow {

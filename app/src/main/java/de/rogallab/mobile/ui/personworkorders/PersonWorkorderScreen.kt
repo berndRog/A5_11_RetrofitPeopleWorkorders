@@ -23,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -49,6 +51,7 @@ import de.rogallab.mobile.ui.composables.InputWorkorderCompleted
 import de.rogallab.mobile.ui.composables.PersonCard
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.workorders.WorkorderUiEvent
+import kotlinx.coroutines.delay
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
@@ -61,6 +64,7 @@ fun PersonWorkorderScreen(
    val tag = "ok>PersonWorkorderScr ."
 
 
+   //region Back handler for back navigation
    BackHandler(
       enabled = true,
       onBack = {
@@ -70,15 +74,21 @@ fun PersonWorkorderScreen(
          }
       }
    )
+   //endregion
 
-   workorderId?.let {
-      LaunchedEffect(Unit) {
-         logDebug(tag, "readByIdWithPerson()")
-         viewModel.readByIdWithWorkorders(workorderId)
+   //region read workorder by id with person
+   val toggleRead: MutableState<Boolean> = remember { mutableStateOf(true) }
+   workorderId?.let { id ->
+      LaunchedEffect(toggleRead.value) {
+         logDebug(tag, "readWorkorderByIdWithPerson()")
+         viewModel.readWorkorderByIdWithPerson(id)
       }
    } ?: run {
-      //viewModel.onTriggerErrorEvent("No id for person is given", true)
+      viewModel.showAndNavigateBackOnFailure(
+         Exception("No id for workorder is given"))
    }
+   //endregion
+
    val snackbarHostState = remember { SnackbarHostState() }
 
    Scaffold(
@@ -92,23 +102,19 @@ fun PersonWorkorderScreen(
                      popUpTo(route = NavScreen.PersonWorkorderDetail.route) { inclusive = true }
                   }
                }) {
-                  Icon(
-                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                     contentDescription = stringResource(R.string.back)
-                  )
+                  Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.back))
                }
             }
          )
       },
       snackbarHost = {
          SnackbarHost(hostState = snackbarHostState) { data ->
-            Snackbar(
-               snackbarData = data,
-               actionOnNewLine = true
-            )
+            Snackbar(snackbarData = data, actionOnNewLine = true)
          }
       }
    ) { innerPadding ->
+   //
       Column(
          modifier = Modifier
             .padding(paddingValues = innerPadding)
@@ -138,6 +144,8 @@ fun PersonWorkorderScreen(
                .align(Alignment.End),
             style = MaterialTheme.typography.bodySmall,
          )
+
+         //region title and description
          OutlinedTextField(
             value = viewModel.workorderStateValue.title,                      // State ↓
             onValueChange = {                                                 // Event ↑
@@ -168,8 +176,9 @@ fun PersonWorkorderScreen(
                   keyboardController?.hide()
                }
             ),
-
          )
+         //endregion
+
          InputStartWorkorder(
             state = viewModel.workorderStateValue.state,          // State ↓
             onStateChange = viewModel::onWorkorderUiEventChange,  // Event ↑
@@ -206,6 +215,7 @@ fun PersonWorkorderScreen(
       }
    }
 
+   //region error handling
    viewModel.errorStateValue.errorParams?.let { params: ErrorParams ->
       LaunchedEffect(params) {
          showAndRespondToError(
@@ -216,6 +226,7 @@ fun PersonWorkorderScreen(
          )
       }
    }
+   //endregion
 }
 
 class StateMachine(

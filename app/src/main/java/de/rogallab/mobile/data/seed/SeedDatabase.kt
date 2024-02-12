@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 class SeedDatabase @Inject constructor(
@@ -36,16 +37,16 @@ class SeedDatabase @Inject constructor(
 
          if(countPeople == 0 && countWorkorders == 0) {
             _seed = Seed(_application)
-            coroutineScope.async {
+            withContext(_dispatcher) {
                _seed!!.people.forEach { person ->
                   _peopleRepository.add(person)
                }
-            }.await()
-            coroutineScope.async {
+            }
+            withContext(_dispatcher) {
                _seed!!.workorders.forEach { workorder ->
                   _workordersRepository.add(workorder)
                }
-            }.await()
+            }
          }
       }
       coroutineScope.launch {

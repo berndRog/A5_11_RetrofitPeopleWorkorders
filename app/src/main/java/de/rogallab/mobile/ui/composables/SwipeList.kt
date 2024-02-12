@@ -100,16 +100,3 @@ data class SwipeProperties(
 )
 
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun setCardElevation(dismissBoxState: SwipeToDismissBoxState) =
-   CardDefaults.cardElevation(
-      defaultElevation = 8.dp,
-      pressedElevation =  8.dp,
-      focusedElevation =  8.dp,
-      hoveredElevation = 8.dp,
-      draggedElevation =  8.dp,
-      disabledElevation = 0.dp
-   )
-
-

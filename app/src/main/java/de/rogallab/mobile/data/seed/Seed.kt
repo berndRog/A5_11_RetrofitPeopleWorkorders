@@ -55,7 +55,7 @@ class Seed @Inject constructor(
 
    init {
 
-      if(AppStart.isWebservice) {
+      if(!AppStart.isWebservice) {
          imagesUri = initializeImages()
          people = initializePeople(imagesUri)
          workorders = initializeWorkorders()

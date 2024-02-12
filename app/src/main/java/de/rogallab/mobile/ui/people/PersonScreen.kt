@@ -51,8 +51,8 @@ fun PersonScreen(
    var charMin = 2
    var charMax = 16
 
+   //region DetailScreen -> ReadById(id)
    val isInput: Boolean by rememberSaveable { mutableStateOf(isInputScreen) }
-
    if (!isInput) {
       tag = "ok>PersonDetailScreen ."
       id?.let {
@@ -64,6 +64,7 @@ fun PersonScreen(
          viewModel.showAndNavigateBackOnFailure("No id for person is given")
       }
    }
+   //endregion
 
    BackHandler(
       enabled = true,

@@ -20,10 +20,7 @@ interface ImagesRepository {
    suspend fun post(localImagePath: String): ResultData<Image>
 
    // @PUT("/imageFiles/{fileName}")
-   suspend fun put(fileName: String, localImagePath: String): ResultData<Image>
-
-   @DELETE("/imageFiles/{fileName}")
-   suspend fun delete(fileName: String): ResultData<Unit>
+   suspend fun put(localImagePath: String, remoteUriPath: String): ResultData<Image>
 
 }
 

@@ -1,5 +1,6 @@
 package de.rogallab.mobile.ui.people
 
+import android.util.Patterns
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -44,6 +45,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -58,26 +60,28 @@ class PeopleViewModel @Inject constructor(
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
-   // Observer (DataBinding), Observable is a Person object
+   //region Observer (DataBinding), Observable is a Person object
    private val _personState: MutableState<Person> =  mutableStateOf(Person())
-   // access to the observable
+   // external access to the observable
    val personStateValue: Person
       get() = _personState.value  // Observable (DataBinding)
 
    fun onPersonUiEventChange(event: PersonUiEvent, value: Any) {
       _personState.value = when (event) {
-         PersonUiEvent.Id            -> personStateValue.copy(id        = value as UUID)
-         PersonUiEvent.FirstName     -> personStateValue.copy(firstName = value as String)
-         PersonUiEvent.LastName      -> personStateValue.copy(lastName  = value as String)
-         PersonUiEvent.Email         -> personStateValue.copy(email     = value as String?)
-         PersonUiEvent.Phone         -> personStateValue.copy(phone     = value as String?)
-         PersonUiEvent.ImagePath     -> personStateValue.copy(imagePath = value as String?)
-         PersonUiEvent.RemoteUriPath -> personStateValue.copy(remoteUriPath = value as String?)
+         PersonUiEvent.Id            -> _personState.value.copy(id        = value as UUID)
+         PersonUiEvent.FirstName     -> _personState.value.copy(firstName = value as String)
+         PersonUiEvent.LastName      -> _personState.value.copy(lastName  = value as String)
+         PersonUiEvent.Email         -> _personState.value.copy(email     = value as String?)
+         PersonUiEvent.Phone         -> _personState.value.copy(phone     = value as String?)
+         PersonUiEvent.ImagePath     -> _personState.value.copy(imagePath = value as String?)
+         PersonUiEvent.RemoteUriPath -> _personState.value.copy(remoteUriPath = value as String?)
 
       }
    }
+   //endregion
 
-   // Coroutine ExceptionHandler
+   //region Coroutine handling
+   // ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
       //showOnFailure(exception)
       exception.localizedMessage?.let { message ->
@@ -92,16 +96,15 @@ class PeopleViewModel @Inject constructor(
    private val _coroutineContext = SupervisorJob() + _dispatcher + _exceptionHandler
    // Coroutine Scope
    private val _coroutineScope = CoroutineScope(_coroutineContext)
-
    override fun onCleared() {
       // cancel all coroutines, when lifecycle of the viewmodel ends
       logDebug(tag, "Cancel all child coroutines")
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-   //
-   // Navigation State = ViewModel (one time) UI event
-   //
+   //endregion
+
+   //region Navigation State = ViewModel (one time) UI event
    private var _navState: MutableState<NavState> =
       mutableStateOf(NavState(onNavRequestHandled = ::onNavEventHandled))
    val navState: NavState
@@ -112,15 +115,14 @@ class PeopleViewModel @Inject constructor(
    fun onNavEventHandled() {
       _navState.value = navState.copy(route = null, clearBackStack = true )
    }
-   //
-   // Error State = ViewModel (one time) events
-   //
+   //endregion
+
+   //region Error State = ViewModel (one time) events
    // https://developer.android.com/topic/architecture/ui-layer/events#handle-viewmodel-events
    private val _errorState: MutableState<ErrorState> 
       = mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
    val errorStateValue: ErrorState
       get() = _errorState.value
-
    fun showOnFailure(throwable: Throwable) {
       when (throwable) {
          is CancellationException -> Unit
@@ -159,9 +161,9 @@ class PeopleViewModel @Inject constructor(
       logDebug(tag, "onErrorAction()")
       // toDo
    }
-   //
-   // Fetch people from local database or remote webservice
-   //
+   //endregion
+
+   //region Fetch people from local database or remote webservice
    // trigger for refresh
    private val _refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
    val stateFlowPeople: StateFlow<PeopleUiState> = _refreshTrigger
@@ -211,9 +213,9 @@ class PeopleViewModel @Inject constructor(
       logDebug(tag,"refreshStateFlowPeople()")
       _refreshTrigger.tryEmit(Unit)
    }
-   //
-   // Read person by id
-   //
+   //endregion
+
+   //region Read a person by id
    fun readById(id: UUID) {
       viewModelScope.launch(_dispatcher) {
          logDebug(tag, "readById(${id.as8()}) isWebservice=${AppStart.isWebservice}")
@@ -230,25 +232,26 @@ class PeopleViewModel @Inject constructor(
          }
       }
    }
-   //
-   // Add person
-   //
-   fun add(p: Person? = null) {
+   //endregion
 
+   //region Add a person
+   fun add(p: Person? = null) {
       if(p != null) setStateFromPerson(p)
 
       viewModelScope.launch(_dispatcher) {
-         // upload local image to remote web server
-         if (AppStart.isWebservice) {
-            logDebug(tag, "post imagePath:${_personState.value.imagePath}")
-            logDebug(tag, "post remoteUriPath:${_personState.value.remoteUriPath}")
 
-            var job: Job? = null
-            if (exitsLocalImage(_personState.value.imagePath)) {
-               job = postImage(_personState.value.imagePath!!)
+         if (AppStart.isWebservice) {
+            // upload local image to remote web server
+            val localImagePath = _personState.value.imagePath
+            logDebug(tag, "put imagePath:$localImagePath")
+
+            // is there a new image to upload?
+            _personState.value.imagePath?.let { imagePath ->
+               if (exitsImage(imagePath)) {
+                  // upload image to web server and wait for completion
+                  postImage(imagePath).join()
+               }
             }
-            job?.join() // wait for the image upload
-            
             // post person to remote webservice
             storePerson(getPersonFromState(_personState.value)) { it: Person ->
                _repository.post(it) 
@@ -262,18 +265,31 @@ class PeopleViewModel @Inject constructor(
          }
       }
    }
-   //
-   // update person
-   //
+   //endregion
+
+   //region Update a person
    fun update() {
       viewModelScope.launch(_dispatcher) {
-         // upload image to server
          if(AppStart.isWebservice) {
-            logDebug(tag, "put imagePath:${_personState.value.imagePath}")
-            logDebug(tag, "put remoteUriPath:${_personState.value.remoteUriPath}")
+            // upload new locol image image to web server
+            val localImagePath = _personState.value.imagePath
+            val remoteUriPath = _personState.value.remoteUriPath
+            logDebug(tag, "put imagePath:$localImagePath")
+            logDebug(tag, "put remoteUriPath:$remoteUriPath")
 
-            val job  = putOrPostImage()
-            job?.join() // wait for the image upload
+            // is there a new image to upload?
+            val imageJob: Job? = localImagePath?.let{ imagePath: String ->
+               if(exitsImage(imagePath)) {
+                  // exists a remote image?
+                  when (remoteUriPath) {
+                     // no -> post image
+                     null, "" -> postImage(imagePath)
+                     // yes -> put image, i.e. replace the image on the web server
+                     else -> putImage(imagePath, remoteUriPath)
+                  }
+               } else null
+            }
+            imageJob?.join() // wait for the image upload
 
             // post person to remote webservice
             storePerson(getPersonFromState(_personState.value)) { it: Person ->
@@ -288,13 +304,91 @@ class PeopleViewModel @Inject constructor(
          }
       }
    }
+   //endregion
 
+   //region Eliminate a person, i.e remove from local database and delete on remote webservice
+   fun eliminate(id: UUID) {
+      viewModelScope.launch(_dispatcher) {
+         logDebug(tag, "remove(${id.as8()})")
+         if(AppStart.isWebservice) {
+            // webserver is handling the deletion a the imageFile and the image object
+            eliminatePerson(id) { it: UUID ->
+               _repository.delete(it)
+            }
+         } else {
+            // delete image from local storage
+            _personState.value.imagePath?.let {
+               deleteFileOnInternalStorage(it)
+            }
+            eliminatePerson(id) { it: UUID ->
+               _repository.remove(it)
+            }
+         }
+      }
+   }
+   //endregion
+
+   //region Clear PersonState
+   fun clearState() {
+      logDebug(tag, "clearState")
+      _personState.value = Person()
+      onNavEvent(route = NavScreen.PersonInput.route, clearBackStack = false)
+   }
+   // endregion
+
+   fun getActualImagePath(): String? =
+      getLocalOrRemoteImagePath(_personState.value.imagePath,
+         _personState.value.remoteUriPath)
+
+   //region validate Input before add or update
+   fun validateAndNavigate(
+      isInput:Boolean,
+      charMin: Int = 2,
+      charMax: Int = 16
+   ) {
+      // firstName or lastName too short
+      if (_personState.value.firstName.isEmpty() ||
+          _personState.value.firstName.length < charMin) {
+         val message = errorMessages.firstNameTooShort
+         showOnError(message)
+         return
+      } else if (_personState.value.lastName.isEmpty() ||
+                 _personState.value.lastName.length < charMin) {
+         val message = errorMessages.lastNameTooShort
+         showOnError(message)
+         return
+      }
+      // firstName or lastName too long
+      else if (_personState.value.firstName.length > charMax) {
+         val message = errorMessages.firstNameTooLong
+         showOnError(message)
+         return
+      } else if (_personState.value.lastName.length > charMax) {
+         val message = errorMessages.lastNameTooLong
+         showOnError(message)
+         return
+      } else if (_personState.value.email != null &&
+         !Patterns.EMAIL_ADDRESS.matcher(_personState.value.email!!).matches()) {
+         val message = errorMessages.emailInValid
+         this.showOnError(message)
+         return
+      } else if (personStateValue.phone != null &&
+         !Patterns.PHONE.matcher(_personState.value.phone!!).matches()) {
+         val message: String = errorMessages.phoneInValid
+         this.showOnError(message)
+         return
+      } else {
+         if (isInput) this.add()
+         else this.update()
+      }
+   }
+
+   //region Store person to local database or remote webserver
    private suspend fun storePerson(
       person: Person,
-      send: suspend (Person) -> ResultData<Unit>
+      store: suspend (Person) -> ResultData<Unit>
    ) {
-      val result: ResultData<Unit> = send(person)
-      when (result) {
+      when (val result: ResultData<Unit> = store(person)) {
          is ResultData.Success -> {
             refreshStateFlowPeople()
             onNavEvent(route = NavScreen.PeopleList.route)
@@ -303,60 +397,44 @@ class PeopleViewModel @Inject constructor(
          else -> Unit
       }
    }
+   //endregion
 
-   private suspend fun putOrPostImage(): Job? =
-      if (exitsLocalImage(_personState.value.imagePath) &&
-         _personState.value.remoteUriPath == null) {
-         postImage(_personState.value.imagePath!!)
-      }
-      // a remote image exists, update the remote image with the new local image
-      else if (exitsLocalImage(_personState.value.imagePath) &&
-         _personState.value.remoteUriPath != null) {
-         putImage(_personState.value.imagePath!!, _personState.value.remoteUriPath!!)
-      } else {
-         null
-      }
-
-
-   fun remove(id: UUID) {
-      viewModelScope.launch(_dispatcher) {
-         logDebug(tag, "remove(${id.as8()})")
-         //if (isWebservice && person.imagePath != null) {
-            //val resultImage = _imagesRepository.delete(person.imagePath!!)
-            //when (resultImage) {
-            //   is ResultData.Failure -> showAndNavigateBackOnFailure(resultImage.throwable)
-            //   else -> Unit
-            //}
-         //}
-         var result: ResultData<Unit>
-         if(AppStart.isWebservice) result = _repository.delete(id)
-         else                      result = _repository.remove(id)
-         when (result) {
-            is ResultData.Success -> {
-               refreshStateFlowPeople()
-            }
-            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
-            else -> Unit
+   // region eliminate person from local database or remote webserver
+   private suspend fun eliminatePerson(
+      id: UUID,
+      delete: suspend (UUID) -> ResultData<Unit>
+   ) {
+      when (val result: ResultData<Unit> = delete(id)) {
+         is ResultData.Success -> {
+            refreshStateFlowPeople()
+            onNavEvent(route = NavScreen.PeopleList.route)
          }
+         is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
+         else -> Unit
       }
    }
-   private fun exitsLocalImage(localImagePath: String?): Boolean =
-      personStateValue.imagePath != null &&
-         exitsFileOnInternalStorage(personStateValue.imagePath!!)
+   //endregion
 
+   //region Image handling exists, post, put
+   private fun exitsImage(localImagePath: String): Boolean =
+      exitsFileOnInternalStorage(localImagePath)
 
    private suspend fun postImage(
       localImagePath: String
    ): Job = _coroutineScope.launch {
       logDebug(tag, "update() -> postImage()")
       // post imageFile to remote server
-      val resultImage: ResultData<Image> = _coroutineScope.async {
+//    val resultImage: ResultData<Image> = _coroutineScope.async {
+//       _imagesRepository.post(localImagePath)
+//    }.await()
+      val resultImage: ResultData<Image> = withContext(_dispatcher) {
          _imagesRepository.post(localImagePath)
-      }.await()
+      }
+
       when (resultImage) {
          is ResultData.Success -> {
             deleteFileOnInternalStorage(localImagePath)
-            _personState.value = personStateValue.copy(
+            _personState.value = _personState.value.copy(
                imagePath = null,
                remoteUriPath = resultImage.data.remoteUriPath,
                imageId = resultImage.data.id
@@ -373,7 +451,7 @@ class PeopleViewModel @Inject constructor(
    ): Job = _coroutineScope.launch {
       // replace imageFile on remote server
       logDebug(tag, "update() -> putImage()")
-      val resultImage: ResultData<Image> = _coroutineScope.async{
+      val resultImage: ResultData<Image> = _coroutineScope.async {
          _imagesRepository.put(localImagePath, remoteUriPath)
       }.await()
 
@@ -390,16 +468,7 @@ class PeopleViewModel @Inject constructor(
          else -> Unit
       }
    }
-
-   fun getActualImagePath(): String? =
-      getLocalOrRemoteImagePath(_personState.value.imagePath,
-         _personState.value.remoteUriPath)
-
-   fun clearState() {
-      logDebug(tag, "clearState")
-      _personState.value = Person()
-      onNavEvent(route = NavScreen.PersonInput.route, clearBackStack = false)
-   }
+   //endregion
 
    private fun setStateFromPerson(person: Person) {
       _personState.value = person.copy()

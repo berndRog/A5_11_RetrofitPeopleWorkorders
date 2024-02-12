@@ -147,7 +147,7 @@ fun PeopleListScreen(
                            navController.navigate(NavScreen.PersonDetail.route + "/${person.id}")
                            return@rememberSwipeToDismissBoxState true
                         } else if (it == SwipeToDismissBoxValue.EndToStart) {
-                           viewModel.remove(person.id)
+                           viewModel.eliminate(person.id)
                            // undo delete
                            val job = showUndo(
                               coroutineScope = coroutineScope,

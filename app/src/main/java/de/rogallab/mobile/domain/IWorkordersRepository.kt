@@ -1,5 +1,6 @@
 package de.rogallab.mobile.domain
 
+import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.Workorder
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -12,6 +13,7 @@ interface IWorkordersRepository {
    suspend fun add(workorder: Workorder): ResultData<Unit>
    suspend fun update(workorder: Workorder): ResultData<Unit>
    suspend fun remove(id: UUID): ResultData<Unit>
+   suspend fun findByIdWithPerson(id: UUID): ResultData<Map<Workorder, Person?>>
 
    // W E B S E R V I C E
    fun getAll(): Flow<ResultData<List<Workorder>>>

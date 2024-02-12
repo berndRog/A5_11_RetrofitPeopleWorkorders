@@ -118,7 +118,9 @@ class ImagesRepositoryImpl @Inject constructor(
                if(result is ResultData.Failure) return@withContext result
 
                val body = (result as ResultData.Success).data
-               val response: Response<ImageDto> = _service.update(remoteUriPath, body)
+               // fileName = last element of uriPath
+               var fileName = remoteUriPath.split("/").last()
+               val response: Response<ImageDto> = _service.update(fileName, body)
 
                if (response.isSuccessful) {
                   // Handle the successful response
@@ -130,23 +132,6 @@ class ImagesRepositoryImpl @Inject constructor(
                } else {
                   return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
                }
-            }
-         }
-         catch (t: Throwable) {
-            return@withContext ResultData.Failure(t)
-         }
-      }
-
-   override suspend fun delete(
-      fileName: String
-   ): ResultData<Unit> =
-      withContext(_dispatcher ) {
-         try {
-            val response: Response<ImageDto> = _service.delete(fileName)
-            if (response.isSuccessful) {
-               return@withContext ResultData.Success(Unit)
-            } else {
-               return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
             }
          }
          catch (t: Throwable) {

@@ -13,6 +13,8 @@ import de.rogallab.mobile.domain.ResultData
 import de.rogallab.mobile.domain.entities.Person
 import de.rogallab.mobile.domain.entities.WorkState
 import de.rogallab.mobile.domain.entities.Workorder
+import de.rogallab.mobile.domain.mapping.toPerson
+import de.rogallab.mobile.domain.mapping.toWorkorder
 import de.rogallab.mobile.domain.utilities.as8
 import de.rogallab.mobile.domain.utilities.logDebug
 import de.rogallab.mobile.domain.utilities.logError
@@ -43,6 +45,7 @@ import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -53,39 +56,43 @@ class PersonWorkordersViewModel @Inject constructor(
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
-   // Observer (DataBinding), Observable is a Person object
+   //region  Observer (DataBinding), Observable is a Person object
    private val _personState: MutableState<Person> =  mutableStateOf(Person())
    // access to the observable
    val personStateValue: Person
       get() = _personState.value  // Observable (DataBinding)
+   // no event handling needed
+   //endregion
 
-   // Observer (DataBinding), Observable is a Person object
+   //region Observer (DataBinding), Observable is a Person object
    private val _workorderState: MutableState<Workorder> =  mutableStateOf(Workorder())
    // access to the observable
    val workorderStateValue: Workorder
       get() = _workorderState.value  // Observable (DataBinding)
    fun onWorkorderUiEventChange(event: WorkorderUiEvent, value: Any) {
       _workorderState.value = when (event) {
-         WorkorderUiEvent.Title -> workorderStateValue.copy(title = value as String)
-         WorkorderUiEvent.Description -> workorderStateValue.copy(description = value as String)
-         WorkorderUiEvent.State -> workorderStateValue.copy(state = value as WorkState)
-         WorkorderUiEvent.Started -> workorderStateValue.copy(started = value as ZonedDateTime)
-         WorkorderUiEvent.Created -> workorderStateValue.copy(created = value as ZonedDateTime)
+         WorkorderUiEvent.Title -> _workorderState.value.copy(title = value as String)
+         WorkorderUiEvent.Description -> _workorderState.value.copy(description = value as String)
+         WorkorderUiEvent.State -> _workorderState.value.copy(state = value as WorkState)
+         WorkorderUiEvent.Started -> _workorderState.value.copy(started = value as ZonedDateTime)
+         WorkorderUiEvent.Created -> _workorderState.value.copy(created = value as ZonedDateTime)
          WorkorderUiEvent.Completed -> {
-            workorderStateValue.copy(completed = value as ZonedDateTime)
-            workorderStateValue.copy(duration = Duration.between(
-               workorderStateValue.started.toInstant(),
+            _workorderState.value.copy(completed = value as ZonedDateTime)
+            _workorderState.value.copy(duration = Duration.between(
+               _workorderState.value.started.toInstant(),
                value.toInstant())
             )
          }
-         WorkorderUiEvent.Remark -> workorderStateValue.copy(remark = value as String)
-         WorkorderUiEvent.ImagePath -> workorderStateValue.copy(imagePath = value as String?)
-         WorkorderUiEvent.Id -> workorderStateValue.copy(id = value as UUID)
-         WorkorderUiEvent.Person -> workorderStateValue.copy(person = value as Person?)
-         WorkorderUiEvent.PersonId -> workorderStateValue.copy(personId = value as UUID?)
+         WorkorderUiEvent.Remark -> _workorderState.value.copy(remark = value as String)
+         WorkorderUiEvent.ImagePath -> _workorderState.value.copy(imagePath = value as String?)
+         WorkorderUiEvent.Id -> _workorderState.value.copy(id = value as UUID)
+         WorkorderUiEvent.Person -> _workorderState.value.copy(person = value as Person?)
+         WorkorderUiEvent.PersonId -> _workorderState.value.copy(personId = value as UUID?)
       }
    }
+   //endregion
 
+   //region Coroutine
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
       showOnFailure(exception)
@@ -107,9 +114,10 @@ class PersonWorkordersViewModel @Inject constructor(
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-   //
+   //endregion
+
+   //region Navigation State
    // Navigation State = ViewModel (one time) UI event
-   //
    private var _navState: MutableState<NavState> =
       mutableStateOf(NavState(onNavRequestHandled = ::onNavEventHandled))
    val navState: NavState
@@ -120,20 +128,23 @@ class PersonWorkordersViewModel @Inject constructor(
    fun onNavEventHandled() {
       _navState.value = navState.copy(route = null, clearBackStack = true )
    }
-   //
+   //endregion
+
+   //region Error State
    // Error State = ViewModel (one time) events
-   //
    // https://developer.android.com/topic/architecture/ui-layer/events#handle-viewmodel-events
    private val _errorState: MutableState<ErrorState> 
       = mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
    val errorStateValue: ErrorState
       get() = _errorState.value
-
    fun showOnFailure(throwable: Throwable) =
-      showOnError(throwable.localizedMessage ?: "Unknown error")
+      when (throwable) {
+         is CancellationException -> Unit
+         else -> showOnError(throwable.localizedMessage ?: "Unknown error")
+      }
    fun showOnError(errorMessage: String) {
       logError(tag, errorMessage)
-      _errorState.value = errorStateValue.copy(
+      _errorState.value = _errorState.value.copy(
          errorParams = ErrorParams(
             message = errorMessage,
             isNavigation = false
@@ -146,7 +157,7 @@ class PersonWorkordersViewModel @Inject constructor(
       showAndNavigateBackOnError(throwable.localizedMessage ?: "Unknown error")
    fun showAndNavigateBackOnError(errorMessage: String) {
       logError(tag, errorMessage)
-      _errorState.value = errorStateValue.copy(
+      _errorState.value = _errorState.value.copy(
          errorParams = ErrorParams(
             message = errorMessage,
             isNavigation = true,
@@ -156,16 +167,16 @@ class PersonWorkordersViewModel @Inject constructor(
    }
    fun onErrorEventHandled() {
       logDebug(tag, "onErrorEventHandled()")
-      _errorState.value = errorStateValue.copy(errorParams = null)
+      _errorState.value = _errorState.value.copy(errorParams = null)
    }
    // error handling
    fun onErrorAction() {
       logDebug(tag, "onErrorAction()")
       // toDo
    }
-   //
-   // Fetch workorders from local database or remote web service
-   //
+   //endregion
+
+   //region Fetch workorders from local database or remote web service
    // trigger for refresh
    private val _refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
    val stateFlowWorkorders: StateFlow<WorkordersUiState> = _refreshTrigger
@@ -204,12 +215,12 @@ class PersonWorkordersViewModel @Inject constructor(
       logDebug(tag,"refreshStateFlowWorkorders()")
       _refreshTrigger.tryEmit(Unit)
    }
-   //
-   // Read person by id with workorders
-   //
-   fun readByIdWithWorkorders(id: UUID) {
+   //endregion
+
+   //region Read person by id with workorders
+   fun readPersonByIdWithWorkorders(id: UUID) {
       _coroutineScope.launch {
-         logDebug(tag, "readByIdWithWorkorders(${id.as8()}) " +
+         logDebug(tag, "readPersonByIdWithWorkorders(${id.as8()}) " +
             "isWebservice=${AppStart.isWebservice}")
 
          var result: ResultData<Person?>
@@ -218,7 +229,7 @@ class PersonWorkordersViewModel @Inject constructor(
          when (result) {
             is ResultData.Success -> {
                result.data?.let { person: Person ->
-                  setStateFromPerson(person)
+                  _personState.value = person.copy()
                }
                //onNavEvent(route = NavScreen.PeopleList.route)
             }
@@ -227,19 +238,51 @@ class PersonWorkordersViewModel @Inject constructor(
          }
       }
    }
+   //endregion
 
+   //region Read workorder by id with assigned person
+   fun readWorkorderByIdWithPerson(id: UUID) {
+      _coroutineScope.launch {
+         logDebug(tag, "readWorkorderByIdWithPerson(${id.as8()}) " +
+            "isWebservice=${AppStart.isWebservice}")
+
+         var result: ResultData<Map<Workorder, Person?>>
+//         if(AppStart.isWebservice) result = _peopleRepository.getByIdWithWorkorders(id)
+//         else                      result = _peopleRepository.findByIdWithWorkorders(id)
+         result = _workordersRepository.findByIdWithPerson(id)
+         when (result) {
+            is ResultData.Success -> {
+               result.data?.let { it: Map<Workorder, Person?> ->
+                  val workorder: Workorder = it.keys.first()
+                  _workorderState.value = workorder.copy()
+
+                  val person: Person? = it.values.first()
+                  person?.let{ it ->
+                     _personState.value = it.copy() }
+               }
+               //onNavEvent(route = NavScreen.PeopleList.route)
+            }
+            is ResultData.Failure -> showAndNavigateBackOnFailure(result.throwable)
+            else -> Unit
+         }
+      }
+   }
+   //endregion
+
+   //region Assign and unassign workorder
    fun assign(workorder: Workorder) {
-      personStateValue.addWorkorder(workorder)
+      _personState.value.addWorkorder(workorder)
    }
 
    fun unassign(workorder: Workorder) {
-      personStateValue.removeWorkorder(workorder)
+      _personState.value.removeWorkorder(workorder)
    }
+   //endregion
+
+   //region Update workorder
    //
-   // Update workorder
-   //
-   fun update(w: Workorder? = null, route:String? = null) {
-      val workorder = w ?: getWorkorderFromState(workorderStateValue)
+   fun update(w: Workorder? = null) {
+      val workorder = w ?: getWorkorderFromState(_workorderState.value)
       _coroutineScope.launch {
          logDebug(tag,"update() isWebservice=${AppStart.isWebservice}")
          var result: ResultData<Unit>
@@ -253,17 +296,12 @@ class PersonWorkordersViewModel @Inject constructor(
    }
 
    fun getImagePath(): String? {
-      if(personStateValue.imagePath == null && personStateValue.remoteUriPath != null)
+      if(_personState.value.imagePath == null && _personState.value.remoteUriPath != null)
          return personStateValue.remoteUriPath
-      else if(personStateValue.imagePath != null && personStateValue.remoteUriPath == null)
-         return personStateValue.imagePath
+      else if(_personState.value.imagePath != null && _personState.value.remoteUriPath == null)
+         return _personState.value.imagePath
       else return null
    }
-
-   private fun setStateFromPerson(person: Person) {
-      _personState.value = person.copy()
-   }
-
 
    companion object {
       private const val tag = "ok>PeopleViewModel    ."
