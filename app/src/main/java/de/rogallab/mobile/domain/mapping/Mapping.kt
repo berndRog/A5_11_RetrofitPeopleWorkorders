@@ -11,57 +11,55 @@ import de.rogallab.mobile.domain.utilities.toZonedDateTime
 import de.rogallab.mobile.domain.utilities.toZuluString
 import java.time.Duration
 
-fun toImage(imageDto: ImageDto): Image = Image(
-   remoteUriPath = imageDto.remoteUriPath,
-   contentType = imageDto.contentType,
-   updated = toZonedDateTime(imageDto.updated),
-   id = imageDto.id,
-   userId = imageDto.userId,
-
+fun ImageDto.toImage(): Image = Image(
+   id = id,
+   remoteUriPath = remoteUriPath,
+   contentType = contentType,
+   updated = toZonedDateTime(updated),
+   userId = userId,
 )
-fun toImageDto(image: Image): ImageDto = ImageDto(
-   contentType = image.contentType,
-   remoteUriPath = image.remoteUriPath,
-   updated = toZuluString(image.updated),
-   id = image.id,
-   userId = image.userId,
+fun Image.toImageDto(): ImageDto = ImageDto(
+   id = id,
+   contentType = contentType,
+   remoteUriPath = remoteUriPath,
+   updated = toZuluString(updated),
+   userId = userId,
 )
 
-fun toPerson(personDto:PersonDto): Person = Person(
-   firstName = personDto.firstName,
-   lastName = personDto.lastName,
-   email = personDto.email,
-   phone = personDto.phone,
-   imagePath = personDto.imagePath,
-   remoteUriPath = personDto.remoteUriPath,
-   id = personDto.id,
-   imageId = personDto.imageId,
+fun PersonDto.toPerson(): Person = Person(
+   id = id,
+   firstName = firstName,
+   lastName = lastName,
+   email = email,
+   phone = phone,
+   imagePath = imagePath,
+   remoteUriPath = remoteUriPath,
+   imageId = imageId,
    workorders = mutableListOf(),
-   //address = personDto.address?.let{ toAddress(it) }
 )
 
-fun toPersonDto(person:Person): PersonDto = PersonDto(
-   firstName = person.firstName,
-   lastName = person.lastName,
-   email = person.email,
-   phone = person.phone,
-   imagePath = person.imagePath,
-   remoteUriPath = person.remoteUriPath,
-   id = person.id,
-   imageId = person.imageId,
+fun Person.toPersonDto(): PersonDto = PersonDto(
+   id = id,
+   firstName = firstName,
+   lastName = lastName,
+   email = email,
+   phone = phone,
+   imagePath = imagePath,
+   remoteUriPath = remoteUriPath,
+   imageId = imageId,
 )
 
-fun toWorkorder(workorderDto:WorkorderDto): Workorder = Workorder(
-   title = workorderDto.title,
-   description = workorderDto.description,
-   created = toZonedDateTime(workorderDto.created),
-   started = toZonedDateTime(workorderDto.started),
-   completed = toZonedDateTime(workorderDto.completed),
-   state = workorderDto.state,
-   duration = Duration.ofNanos(workorderDto.duration), // convert duration into nanos
-   remark = workorderDto.remark,
-   id = workorderDto.id,
-   personId = workorderDto.personId,
+fun WorkorderDto.toWorkorder(): Workorder = Workorder(
+   id = id,
+   title = title,
+   description = description,
+   created = toZonedDateTime(created),
+   started = toZonedDateTime(started),
+   completed = toZonedDateTime(completed),
+   state = state,
+   duration = Duration.ofNanos(duration), // convert duration into nanos
+   remark = remark,
+   personId = personId,
 )
 
 fun toWorkorderDto(workorder: Workorder): WorkorderDto = WorkorderDto(
@@ -78,9 +76,8 @@ fun toWorkorderDto(workorder: Workorder): WorkorderDto = WorkorderDto(
 )
 
 fun toPerson(personDtoWithWorkorderDtos:PersonDtoWithWorkorderDtos): Person {
-   val person = toPerson(personDtoWithWorkorderDtos.personDto)
-   val workorders = personDtoWithWorkorderDtos.workorderDtos.map { it -> toWorkorder(it) }
+   val person = personDtoWithWorkorderDtos.personDto.toPerson()
+   val workorders = personDtoWithWorkorderDtos.workorderDtos.map { it: WorkorderDto -> it.toWorkorder() }
    person.workorders.addAll(workorders)
    return person
 }
-

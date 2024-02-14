@@ -38,7 +38,7 @@ class PeopleRepositoryImpl @Inject constructor(
       try {
          var flowPeopleDto: Flow<List<PersonDto>> = _dao.selectAll()
          flowPeopleDto.collect { peopleDto: List<PersonDto> ->
-            val people: List<Person> = peopleDto.map { it: PersonDto -> toPerson(it) }
+            val people: List<Person> = peopleDto.map { it: PersonDto -> it.toPerson() }
             logDebug(tag, "selectAll() ${people.size} items")
             emit(ResultData.Success(people))
          }
@@ -55,8 +55,8 @@ class PeopleRepositoryImpl @Inject constructor(
    override suspend fun findById(id: UUID): ResultData<Person?> =
       withContext(_dispatcher) {
          try {
-            _dao.selectById(id)?.let { dto: PersonDto ->
-               val person: Person = toPerson(dto)
+            _dao.selectById(id)?.let { it: PersonDto ->
+               val person: Person = it.toPerson()
                logDebug(tag, "findById() success")
                return@withContext ResultData.Success(person)
             } ?: run {
@@ -78,7 +78,7 @@ class PeopleRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             logDebug(tag, "insert() ${person.asString()}")
-            _dao.insert(toPersonDto(person))
+            _dao.insert(person.toPersonDto())
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {  return@withContext ResultData.Failure(t)}
       }
@@ -87,7 +87,7 @@ class PeopleRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             logDebug(tag, "update() ${person.asString()}")
-            _dao.update(toPersonDto(person))
+            _dao.update(person.toPersonDto())
             return@withContext ResultData.Success(Unit)
          } catch(t: Throwable) {
             return@withContext ResultData.Failure(t)
@@ -122,8 +122,10 @@ class PeopleRepositoryImpl @Inject constructor(
          try {
             var person: Person? = null
             _dao.findByIdWithWorkorders(id)?.map { (personDto, workordersDto) ->
-               person = toPerson(personDto)
-               workordersDto.map { person?.addWorkorder(toWorkorder(it)) }
+               person = personDto.toPerson()
+               workordersDto.map { it: WorkorderDto ->
+                  person?.addWorkorder(it.toWorkorder())
+               }
             }
             logDebug(tag, "findByIdWithWorkorders() " +
                   "${person?.asString()} ${person?.workorders?.size} workorders")
@@ -142,8 +144,8 @@ class PeopleRepositoryImpl @Inject constructor(
             emit(ResultData.Failure(IOException("${httpStatusMessage(response.code())}")))
             return@flow
          }
-         val people = response.body()?.map {
-            it: PersonDto -> toPerson(it)
+         val people = response.body()?.map { it: PersonDto ->
+            it.toPerson()
          }  ?: run {
             emit(ResultData.Failure(IOException("response.body() is null")))
             return@flow
@@ -163,8 +165,8 @@ class PeopleRepositoryImpl @Inject constructor(
                return@withContext ResultData.Failure(
                   IOException(" ${httpStatusMessage(response.code())}"))
 
-            response.body()?.let { personDto ->
-               val person: Person = toPerson(personDto)
+            response.body()?.let { it: PersonDto ->
+               val person: Person = it.toPerson()
                return@withContext ResultData.Success(person)
             } ?: return@withContext ResultData.Failure(
                                        IOException("response.body() is null"))
@@ -175,7 +177,7 @@ class PeopleRepositoryImpl @Inject constructor(
    override suspend fun post(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
-            val response = _webservice.post(toPersonDto(person))
+            val response = _webservice.post(person.toPersonDto())
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
@@ -189,7 +191,7 @@ class PeopleRepositoryImpl @Inject constructor(
    override suspend fun put(person: Person): ResultData<Unit> =
       withContext(_dispatcher) {
          try {
-            val response = _webservice.put(person.id, toPersonDto(person))
+            val response = _webservice.put(person.id, person.toPersonDto())
             if (response.isSuccessful) {
                return@withContext ResultData.Success(Unit)
             } else {
@@ -222,8 +224,9 @@ class PeopleRepositoryImpl @Inject constructor(
             if (! responsePerson.isSuccessful) return@withContext ResultData.Failure(
                IOException("${httpStatusMessage(responsePerson.code())}"))
 
-            val person = responsePerson.body()?.let { it: PersonDto ->  toPerson(it) }
-               ?: return@withContext ResultData.Failure(
+            val person = responsePerson.body()?.let { it: PersonDto ->
+               it.toPerson()
+            } ?: return@withContext ResultData.Failure(
                   IOException("response is successful, but body() is null"))
 
             // then retrieve workorders for this person and add them to the person
@@ -232,7 +235,7 @@ class PeopleRepositoryImpl @Inject constructor(
                IOException("${httpStatusMessage(responseWorkorders.code())}"))
 
             responseWorkorders.body()?.forEach { it: WorkorderDto ->
-               person.addWorkorder(toWorkorder(it))
+               person.addWorkorder(it.toWorkorder())
             } ?: return@withContext ResultData.Failure(IOException("response.body() is null"))
 
             logDebug(tag, "getByIdWithWorkorders() " +

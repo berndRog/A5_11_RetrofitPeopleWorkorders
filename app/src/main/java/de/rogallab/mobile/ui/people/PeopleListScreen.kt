@@ -29,6 +29,8 @@ import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,11 +66,19 @@ fun PeopleListScreen(
 ) {
    val tag = "ok>PeopleListScreen   ."
 
-  // https://alexzh.com/jetpack-compose-pull-to-refresh/
-  // https://canlioya.medium.com/customise-pull-to-refresh-on-android-with-jetpack-compose-24a7119a4b94
-//   val pullRefreshState = rememberPullRefreshState(
-//      refreshing = state.isLoading,
-//      onRefresh = viewModel::loadOrders
+
+//   val pullRefreshState = rememberPullToRefreshState()
+//
+//   PullToRefreshContainer(
+//      state = pullRefreshState,
+//      )
+
+//
+//   PullRefreshIndicator(
+//      refreshing = viewModel.peopleStateValue.isLoading,
+//      state = pullRefreshState,
+//      modifier = Modifier.align(Alignment.TopCenter),
+//      backgroundColor = if (viewModel.peopleStateValue.isLoading) Color.Red else Color.Green,
 //   )
 
    val peopleState: PeopleUiState by viewModel.stateFlowPeople.collectAsStateWithLifecycle()
@@ -120,7 +130,8 @@ fun PeopleListScreen(
          Column(
             modifier = Modifier
                .padding(bottom = innerPadding.calculateBottomPadding())
-               .padding(horizontal = 8.dp).fillMaxSize(),
+               .padding(horizontal = 8.dp)
+               .fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
          ) {
@@ -132,7 +143,8 @@ fun PeopleListScreen(
          logVerbose(tag, "peopleState Success items ${items.size}")
 
          LazyColumn(
-            modifier = Modifier.padding(paddingValues = innerPadding)
+            modifier = Modifier
+               .padding(paddingValues = innerPadding)
                .padding(horizontal = 8.dp),
             state = rememberLazyListState()
          ) {
@@ -203,3 +215,4 @@ fun PeopleListScreen(
       }
    }
 }
+

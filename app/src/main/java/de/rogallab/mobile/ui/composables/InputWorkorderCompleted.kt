@@ -1,5 +1,6 @@
 package de.rogallab.mobile.ui.composables
 
+import androidx.compose.animation.core.estimateAnimationDurationMillis
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,14 +26,17 @@ import de.rogallab.mobile.ui.base.NavState
 import de.rogallab.mobile.ui.navigation.NavScreen
 import de.rogallab.mobile.ui.workorders.WorkorderUiEvent
 import kotlinx.coroutines.delay
+import java.time.Duration
 import java.time.ZonedDateTime
 
 @Composable
 fun InputWorkorderCompleted(
    state: WorkState,                                              // State ↓
    onStateChange: (WorkorderUiEvent, WorkState) -> Unit,          // Event ↑
+   started: ZonedDateTime,                                        // State ↓
    completed: ZonedDateTime,                                      // State ↓
    onCompletedChange: (WorkorderUiEvent, ZonedDateTime) -> Unit,  // Event ↑
+   onDurationChange:(WorkorderUiEvent, Duration) -> Unit,         // Event ↑
    onUpdate: () -> Unit,                                          // Event ↑
    onNavEvent: (String, Boolean) -> Unit,                         // Event ↑
    modifier: Modifier = Modifier                                  // State ↓
@@ -70,7 +74,11 @@ fun InputWorkorderCompleted(
             onClick = {
                logDebug(tag,"Completed clicked ${zonedDateTimeString(actualCompleted)}")
                isTimerRunning = false
-               onCompletedChange(WorkorderUiEvent.Completed, actualCompleted) // duration is handled too
+               onCompletedChange(WorkorderUiEvent.Completed, actualCompleted)
+               onDurationChange(
+                  WorkorderUiEvent.Duration,
+                  Duration.between(started.toInstant(), actualCompleted.toInstant())
+               )
                onStateChange(WorkorderUiEvent.State, WorkState.Completed)
                onUpdate()                                   // update the workorder
                onNavEvent(NavScreen.PeopleList.route, true) // navigate back to PeopleList

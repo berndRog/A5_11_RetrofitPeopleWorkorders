@@ -76,13 +76,8 @@ class PersonWorkordersViewModel @Inject constructor(
          WorkorderUiEvent.State -> _workorderState.value.copy(state = value as WorkState)
          WorkorderUiEvent.Started -> _workorderState.value.copy(started = value as ZonedDateTime)
          WorkorderUiEvent.Created -> _workorderState.value.copy(created = value as ZonedDateTime)
-         WorkorderUiEvent.Completed -> {
-            _workorderState.value.copy(completed = value as ZonedDateTime)
-            _workorderState.value.copy(duration = Duration.between(
-               _workorderState.value.started.toInstant(),
-               value.toInstant())
-            )
-         }
+         WorkorderUiEvent.Completed -> _workorderState.value.copy(completed = value as ZonedDateTime)
+         WorkorderUiEvent.Duration -> _workorderState.value.copy(duration = value as Duration)
          WorkorderUiEvent.Remark -> _workorderState.value.copy(remark = value as String)
          WorkorderUiEvent.ImagePath -> _workorderState.value.copy(imagePath = value as String?)
          WorkorderUiEvent.Id -> _workorderState.value.copy(id = value as UUID)
@@ -257,8 +252,8 @@ class PersonWorkordersViewModel @Inject constructor(
                   _workorderState.value = workorder.copy()
 
                   val person: Person? = it.values.first()
-                  person?.let{ it ->
-                     _personState.value = it.copy() }
+                  person?.let{ p ->
+                     _personState.value = p.copy() }
                }
                //onNavEvent(route = NavScreen.PeopleList.route)
             }

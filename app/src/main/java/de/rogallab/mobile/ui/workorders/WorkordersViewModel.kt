@@ -52,25 +52,23 @@ class WorkordersViewModel @Inject constructor(
    private val _dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
-   // Observer (DataBinding), Observable is a Person object
+   //region Observer (DataBinding), Observable is a Workorder object
    private val _workorderState: MutableState<Workorder> =  mutableStateOf(Workorder())
    // access to the observable
    val workorderStateValue: Workorder
       get() = _workorderState.value  // Observable (DataBinding)
    fun onWorkorderUiEventChange(event: WorkorderUiEvent, value: Any) {
       _workorderState.value = when (event) {
-         WorkorderUiEvent.Title -> workorderStateValue.copy(title = value as String)
-         WorkorderUiEvent.Description -> workorderStateValue.copy(description = value as String)
-         WorkorderUiEvent.State -> workorderStateValue.copy(state = value as WorkState)
-         WorkorderUiEvent.Started -> workorderStateValue.copy(started = value as ZonedDateTime)
-         WorkorderUiEvent.Created -> workorderStateValue.copy(created = value as ZonedDateTime)
-         WorkorderUiEvent.Completed -> {
-            workorderStateValue.copy(completed = value as ZonedDateTime)
-            workorderStateValue.copy(duration = Duration.between(
-               workorderStateValue.started.toInstant(),
-               value.toInstant())
-            )
-         }
+         WorkorderUiEvent.Title -> _workorderState.value.copy(title = value as String)
+         WorkorderUiEvent.Description -> _workorderState.value.copy(description = value as String)
+         WorkorderUiEvent.State -> _workorderState.value.copy(state = value as WorkState)
+         WorkorderUiEvent.Started -> _workorderState.value.copy(started = value as ZonedDateTime)
+         WorkorderUiEvent.Created -> _workorderState.value.copy(created = value as ZonedDateTime)
+         WorkorderUiEvent.Completed ->  workorderStateValue.copy(completed = value as ZonedDateTime)
+         WorkorderUiEvent.Duration -> workorderStateValue.copy(duration = Duration.between(
+            workorderStateValue.started.toInstant(),
+            workorderStateValue.started.toInstant())
+         )
          WorkorderUiEvent.Remark -> workorderStateValue.copy(remark = value as String)
          WorkorderUiEvent.ImagePath -> workorderStateValue.copy(imagePath = value as String?)
          WorkorderUiEvent.Id -> workorderStateValue.copy(id = value as UUID)
@@ -78,7 +76,9 @@ class WorkordersViewModel @Inject constructor(
          WorkorderUiEvent.PersonId -> workorderStateValue.copy(personId = value as UUID?)
       }
    }
+   //endregion
 
+   //region Coroutine
    // Coroutine ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
       exception.localizedMessage?.let { message ->
@@ -101,9 +101,10 @@ class WorkordersViewModel @Inject constructor(
       _coroutineContext.cancelChildren()
       _coroutineContext.cancel()
    }
-   //
+   //endregion
+
+   //region Navigation State
    // Navigation State = ViewModel (one time) UI event
-   //
    private var _navState: MutableState<NavState> =
       mutableStateOf(NavState(onNavRequestHandled = ::onNavEventHandled))
    val navStateValue: NavState
@@ -114,9 +115,10 @@ class WorkordersViewModel @Inject constructor(
    fun onNavEventHandled() {
       _navState.value = navStateValue.copy(route = null, clearBackStack = true )
    }
-   //
+   //endregion
+
+   //region Error State
    // Error State = ViewModel (one time) UI event
-   //
    private var _errorState: MutableState<ErrorState> =
       mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
    val errorStateValue: ErrorState
@@ -125,7 +127,7 @@ class WorkordersViewModel @Inject constructor(
       showOnError(throwable.localizedMessage ?: "Unknown error")
    fun showOnError(errorMessage: String) {
       logError(tag, errorMessage)
-      _errorState.value = errorStateValue.copy(
+      _errorState.value = _errorState.value.copy(
          errorParams = ErrorParams(
             message = errorMessage,
             isNavigation = false
@@ -138,7 +140,7 @@ class WorkordersViewModel @Inject constructor(
       showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
    fun showAndNavigateBackOnFailure(errorMessage: String) {
       logError(tag, errorMessage)
-      _errorState.value = errorStateValue.copy(
+      _errorState.value = _errorState.value.copy(
          errorParams = ErrorParams(
             message = errorMessage,
             isNavigation = true,
@@ -154,9 +156,9 @@ class WorkordersViewModel @Inject constructor(
       logDebug(tag, "onErrorAction()")
       // toDo
    }
-   //
-   // Fetch workorders from local database or remote web service
-   //
+   //endregion
+
+   //region Fetch workorders from local database or remote web service
    // trigger for refresh
    private val _refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
    val stateFlowWorkorders: StateFlow<WorkordersUiState> = _refreshTrigger
@@ -195,9 +197,9 @@ class WorkordersViewModel @Inject constructor(
       logDebug(tag,"refreshStateFlowWorkorders()")
       _refreshTrigger.tryEmit(Unit)
    }
-   //
-   // Fetch workorder by id
-   //
+   //endregion
+
+   //region Fetch workorder by id
    fun readById(id: UUID) {
       _coroutineScope.launch {
          logDebug(tag,"readById(${id.as8()}) isWebservice=${AppStart.isWebservice}")
@@ -213,9 +215,9 @@ class WorkordersViewModel @Inject constructor(
          }
       }
    }
-   //
-   // Add workorder
-   //
+   //endregion
+
+   //region Add workorder
    fun add(w: Workorder? = null) {
       val workorder: Workorder = w ?: getWorkorderFromState(workorderStateValue)
       _coroutineScope.launch {
@@ -233,9 +235,9 @@ class WorkordersViewModel @Inject constructor(
          }
       }
    }
-   //
-   // Update workorder
-   //
+   //endregion
+
+   //region Update workorder
    fun update(w: Workorder? = null, route:String? = null) {
       val workorder = w ?: getWorkorderFromState(workorderStateValue)
       _coroutineScope.launch {
@@ -253,9 +255,9 @@ class WorkordersViewModel @Inject constructor(
          }
       }
    }
-   //
-   // Remove workorder by id
-   //
+   //endregion
+
+   //region Remove workorder by id
    fun remove(id: UUID) {
       _coroutineScope.launch {
          logDebug(tag,"remove() isWebservice=$AppStart.isWebservice")
@@ -271,7 +273,7 @@ class WorkordersViewModel @Inject constructor(
          }
       }
    }
-
+   //endregion
    /*
    fun readByIdWithPerson(id: UUID) {
       _coroutineScope.launch {
@@ -314,7 +316,7 @@ class WorkordersViewModel @Inject constructor(
    fun clearState() {
       logDebug(tag, "clearState")
       _workorderState.value = Workorder()
-      _workorderState.value = workorderStateValue.copy(created = zonedDateTimeNow())
+      _workorderState.value = _workorderState.value.copy(created = zonedDateTimeNow())
       onNavEvent(route = NavScreen.WorkorderInput.route, clearBackStack = false)
    }
 

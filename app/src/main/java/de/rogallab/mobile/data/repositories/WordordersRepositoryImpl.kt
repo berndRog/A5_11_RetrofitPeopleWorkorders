@@ -42,7 +42,7 @@ class WordordersRepositoryImpl @Inject constructor(
          val flowWordorderDtos: Flow<MutableList<WorkorderDto>> = _dao.selectAll()
          flowWordorderDtos.collect{ workorderDtos: MutableList<WorkorderDto> ->
             val workorders: List<Workorder> =
-               workorderDtos.map { workorderDto: WorkorderDto -> toWorkorder(workorderDto) }
+               workorderDtos.map { it: WorkorderDto -> it.toWorkorder() }
             logDebug(tag, "selectAll()")
             emit(ResultData.Success(workorders))
          }
@@ -55,8 +55,8 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             //throw Exception("Test Error thrown in findById()")
-            _dao.selectById(id)?.let { dto: WorkorderDto ->
-               val workorder: Workorder = toWorkorder(dto)
+            _dao.selectById(id)?.let { it: WorkorderDto ->
+               val workorder: Workorder = it.toWorkorder()
                logDebug(tag, "findById() success")
                return@withContext ResultData.Success(workorder)
             } ?: run {
@@ -122,9 +122,10 @@ class WordordersRepositoryImpl @Inject constructor(
       withContext(_dispatcher) {
          try {
             val map: Map<WorkorderDto, PersonDto?> = _dao.findByIdWithPerson(id)
-            val workorder: Workorder = toWorkorder(map.keys.first())
+            val workorder: Workorder = map.keys.first().toWorkorder()
             val person: Person? = map.values.first()?.let { it: PersonDto ->
-               toPerson(it)} ?: null
+               it.toPerson()
+            }
             val result: Map<Workorder, Person?> = mapOf(workorder to person)
             return@withContext ResultData.Success(result)
          } catch (t: Throwable) {
@@ -141,7 +142,9 @@ class WordordersRepositoryImpl @Inject constructor(
 
          if (response.isSuccessful) {
             response.body()?.let { workordersDto: List<WorkorderDto> ->
-               val workorders: List<Workorder> = workordersDto.map { workorderDto -> toWorkorder(workorderDto) }
+               val workorders: List<Workorder> = workordersDto.map { it: WorkorderDto ->
+                  it.toWorkorder()
+               }
                emit(ResultData.Success(workorders))
             } ?: run {
                emit(ResultData.Failure(IOException("response.body() is null")))
@@ -165,8 +168,8 @@ class WordordersRepositoryImpl @Inject constructor(
             if (! response.isSuccessful)
                return@withContext ResultData.Failure(IOException("${httpStatusMessage(response.code())}"))
 
-            response.body()?.let { workorderDto ->
-               return@withContext ResultData.Success(toWorkorder(workorderDto))
+            response.body()?.let { it: WorkorderDto ->
+               return@withContext ResultData.Success(it.toWorkorder())
             } ?: run {
                return@withContext ResultData.Success(null)
             }

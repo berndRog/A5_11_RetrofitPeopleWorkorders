@@ -26,13 +26,12 @@ import de.rogallab.mobile.ui.base.ErrorState
 import de.rogallab.mobile.ui.base.NavState
 import de.rogallab.mobile.ui.base.getPersonFromState
 import de.rogallab.mobile.ui.navigation.NavScreen
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.Flow
@@ -48,8 +47,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PeopleViewModel @Inject constructor(
    private val _useCases: IPeopleUseCases,
@@ -80,15 +80,24 @@ class PeopleViewModel @Inject constructor(
    }
    //endregion
 
+   //region Observer (DataBinding), Observable is a Person object
+   private val _peopleState: MutableState<PeopleUiState> =  mutableStateOf(PeopleUiState())
+   // external access to the observable
+   val peopleStateValue: PeopleUiState
+      get() = _peopleState.value  // Observable (DataBinding)
+
+
    //region Coroutine handling
    // ExceptionHandler
    private val _exceptionHandler = CoroutineExceptionHandler { _, exception ->
-      //showOnFailure(exception)
-      exception.localizedMessage?.let { message ->
-         logError(tag, message)
-      } ?: run {
-         exception.stackTrace.forEach {
-            logError(tag, it.toString())
+      if(exception !is CancellationException) {
+         showOnFailure(exception)
+         exception.localizedMessage?.let { message ->
+            logError(tag, message)
+         } ?: run {
+            exception.stackTrace.forEach {
+               logError(tag, it.toString())
+            }
          }
       }
    }
@@ -119,7 +128,7 @@ class PeopleViewModel @Inject constructor(
 
    //region Error State = ViewModel (one time) events
    // https://developer.android.com/topic/architecture/ui-layer/events#handle-viewmodel-events
-   private val _errorState: MutableState<ErrorState> 
+   private val _errorState: MutableState<ErrorState>
       = mutableStateOf(ErrorState(onErrorHandled = ::onErrorEventHandled))
    val errorStateValue: ErrorState
       get() = _errorState.value
@@ -131,7 +140,7 @@ class PeopleViewModel @Inject constructor(
    }
    fun showOnError(errorMessage: String) {
       logError(tag, errorMessage)
-      _errorState.value = errorStateValue.copy(
+      _errorState.value = _errorState.value.copy(
          errorParams = ErrorParams(
             message = errorMessage,
             isNavigation = false
@@ -144,7 +153,7 @@ class PeopleViewModel @Inject constructor(
       showAndNavigateBackOnFailure(throwable.localizedMessage ?: "Unknown error")
    fun showAndNavigateBackOnFailure(errorMessage: String) {
       logError(tag, errorMessage)
-      _errorState.value = errorStateValue.copy(
+      _errorState.value = _errorState.value.copy(
          errorParams = ErrorParams(
             message = errorMessage,
             isNavigation = true,
@@ -154,7 +163,7 @@ class PeopleViewModel @Inject constructor(
    }
    fun onErrorEventHandled() {
       logDebug(tag, "onErrorEventHandled()")
-      _errorState.value = errorStateValue.copy(errorParams = null)
+      _errorState.value = _errorState.value.copy(errorParams = null)
    }
    // error handling
    fun onErrorAction() {
@@ -184,17 +193,14 @@ class PeopleViewModel @Inject constructor(
 
                fetch.collect() { result: ResultData<List<Person>> ->
                   when (result) {
-                     is ResultData.Loading -> {
+                     is ResultData.Loading ->
                         emit(PeopleUiState(isLoading = true,
                            isSuccessful = false, people = emptyList()))
-                     }
-                     is ResultData.Success -> {
+                     is ResultData.Success ->
                         emit(PeopleUiState(isLoading = false,
                            isSuccessful = true, people = result.data))
-                     }
-                     is ResultData.Failure -> {
+                     is ResultData.Failure ->
                         showOnFailure(result.throwable)
-                     }
                      else -> Unit
                   }
                }
@@ -451,9 +457,9 @@ class PeopleViewModel @Inject constructor(
    ): Job = _coroutineScope.launch {
       // replace imageFile on remote server
       logDebug(tag, "update() -> putImage()")
-      val resultImage: ResultData<Image> = _coroutineScope.async {
+      val resultImage: ResultData<Image> = withContext(_dispatcher) {
          _imagesRepository.put(localImagePath, remoteUriPath)
-      }.await()
+      }
 
       when (resultImage) {
          is ResultData.Success -> {

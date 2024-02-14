@@ -206,8 +206,10 @@ fun PersonWorkorderScreen(
             InputWorkorderCompleted(
                state = viewModel.workorderStateValue.state,                // State ↓
                onStateChange = viewModel::onWorkorderUiEventChange,        // Event ↑
+               started = viewModel.workorderStateValue.started,            // State ↓
                completed = viewModel.workorderStateValue.completed,        // State ↓
                onCompletedChange = viewModel::onWorkorderUiEventChange,    // Event ↑
+               onDurationChange = viewModel::onWorkorderUiEventChange,     // Event ↑
                onUpdate = viewModel::update,                               // Event ↑
                onNavEvent = viewModel::onNavEvent,                         // Event ↑
             )

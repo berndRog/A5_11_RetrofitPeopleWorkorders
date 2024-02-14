@@ -35,7 +35,7 @@ class ImagesRepositoryImpl @Inject constructor(
             }
             val imageDto = response.body()
             if (imageDto != null) {
-               ResultData.Success(toImage(imageDto))
+               ResultData.Success(imageDto.toImage())
             } else {
                ResultData.Failure(IOException("response.body() is null"))
             }
@@ -94,7 +94,7 @@ class ImagesRepositoryImpl @Inject constructor(
                if (response.isSuccessful) {
                   // Handle the successful response
                   response.body()?.let{ it: ImageDto ->
-                     return@withContext ResultData.Success(toImage(it))
+                     return@withContext ResultData.Success(it.toImage())
                   } ?: run    {
                      return@withContext ResultData.Failure(IOException("response.body() is null"))
                   }
@@ -125,7 +125,7 @@ class ImagesRepositoryImpl @Inject constructor(
                if (response.isSuccessful) {
                   // Handle the successful response
                   response.body()?.let{ it: ImageDto ->
-                     return@withContext ResultData.Success(toImage(it))
+                     return@withContext ResultData.Success(it.toImage())
                   } ?: run    {
                      return@withContext ResultData.Failure(IOException("response.body() is null"))
                   }
